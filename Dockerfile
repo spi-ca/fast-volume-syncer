@@ -13,7 +13,7 @@ COPY main.go selector.go syncer.go go.mod go.sum ./
 RUN set -xe && \
     go mod download && \
     go mod verify && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o fast-volume-syncer . &&
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o fast-volume-syncer .
 
 ##
 ## Deploy
