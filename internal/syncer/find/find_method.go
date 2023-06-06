@@ -12,13 +12,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/internal"
 )
 
 var (
@@ -47,7 +45,7 @@ func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- c
 
 	invoke := exec.CommandContext(
 		ctx,
-		s.FindBinaryPath,
+		s.FinderBinaryPath,
 		root,
 		"-ls",
 	)
@@ -97,13 +95,16 @@ func (s *Scanner) parseFindEntry(line []byte) (*common.Fileinfo, error) {
 	match := func(i int) []byte {
 		if len(matched) < (i+1)*2 {
 			return nil
+		} else if matched[i*2] < 0 || matched[i*2+1] < 0 {
+			return nil
+		} else {
+			return line[matched[i*2]:matched[i*2+1]]
 		}
-		return line[matched[i*2]:matched[i*2+1]]
 	}
 
 	//inode, _ := strconv.Atoi(match(1))
-	size, _ := strconv.ParseInt(string(match(2)), 10, 0)
-	mode := internal.UnFilemode(match(3))
+	size := common.SimpleStrconv(match(2))
+	mode := common.UnFilemode(match(3))
 	//num_of_hardlink, _ := strconv.Atoi(match(4))
 	//owner := match(5)
 	//group := match(6)
@@ -120,8 +121,11 @@ func (s *Scanner) parseFindEntry(line []byte) (*common.Fileinfo, error) {
 		symlinkPathMatch := func(i int) []byte {
 			if len(matched) < (i+1)*2 {
 				return nil
+			} else if matched[i*2] < 0 || matched[i*2+1] < 0 {
+				return nil
+			} else {
+				return path[symlinkedMatched[i*2]:symlinkedMatched[i*2+1]]
 			}
-			return path[symlinkedMatched[i*2]:symlinkedMatched[i*2+1]]
 		}
 		src := symlinkPathMatch(1)
 		//dst := symlinkPathMatch(2)

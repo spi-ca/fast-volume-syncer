@@ -43,24 +43,40 @@ func newChunkJoiner(
 		scanDuration: scanDuration,
 	}
 }
+func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan common.Fileinfo) error {
+	go c.dispatchChunks(ctx, entryRecvChan)
 
-func (c *chunkJoiner) dispatchChunks(ctx context.Context, entryRecvChan <-chan common.Fileinfo) {
+	var err error
+	for newErr := range c.errorChan {
+		err = multierr.Append(err, newErr)
+	}
+	return err
+}
+
+func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-chan common.Fileinfo) {
 	ended := false
 	deadline := time.NewTicker(c.scanDuration)
-
+	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		if err := recover(); err != nil {
 			log.Printf("panic on chunkJoiner: %v", err)
 		}
-
-		log.Printf("closing chunk channel")
+		c.wg.Wait()
 		close(c.errorChan)
+		cancel()
 		deadline.Stop()
 	}()
 
 	var chunk []common.Fileinfo
 	for !ended {
 		select {
+		case <-parentCtx.Done():
+			// 종료시 남은 항목은 무시한다.
+			ended = true
+			if chunk != nil {
+				c.chunkPool.Put(chunk[0:0])
+			}
+			continue
 		case entry, ok := <-entryRecvChan:
 			if !ok {
 				ended = true
@@ -81,7 +97,6 @@ func (c *chunkJoiner) dispatchChunks(ctx context.Context, entryRecvChan <-chan c
 			break
 		}
 
-		// 남은것 처리
 		if len(chunk) > 0 {
 			c.wg.Add(1)
 			c.sem <- true
@@ -92,17 +107,6 @@ func (c *chunkJoiner) dispatchChunks(ctx context.Context, entryRecvChan <-chan c
 			break
 		}
 	}
-}
-func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan common.Fileinfo) error {
-	go c.dispatchChunks(ctx, entryRecvChan)
-
-	var err error
-	for newErr := range c.errorChan {
-		err = multierr.Append(err, newErr)
-	}
-	c.wg.Wait()
-
-	return err
 }
 
 func (c *chunkJoiner) submit(ctx context.Context, chunk []common.Fileinfo) {

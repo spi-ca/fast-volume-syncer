@@ -13,9 +13,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 	"unicode"
+
+	"github.com/schollz/progressbar/v3"
 
 	"github.com/avast/retry-go"
 
@@ -23,7 +24,7 @@ import (
 )
 
 var (
-	rsyncUptodateFormat = regexp.MustCompile(`^(.+?)( is uptodate)?`)
+	rsyncUptodateFormat = regexp.MustCompile(`^(.+?)( is uptodate)?$`)
 )
 
 type Task struct {
@@ -35,8 +36,7 @@ type Task struct {
 	RetryMaxJitter  time.Duration
 }
 
-func (t *Task) Execute(ctx context.Context, fileList []common.Fileinfo) (err error) {
-	log.Printf("argument is %s", t.Arguments)
+func (t *Task) Execute(ctx context.Context, fileList []common.Fileinfo) error {
 
 	if t.RetryAttempts <= 0 {
 		return t.execute(ctx, fileList)
@@ -79,11 +79,6 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 		return
 	}
 	w := bufio.NewWriter(writer)
-	defer func() {
-		if err := w.Flush(); err != nil {
-			log.Printf("failed to flush buffer :%v", err)
-		}
-	}()
 	addSep := false
 	for _, entry := range fileList {
 		mode := entry.Mode
@@ -91,77 +86,96 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 			// ensure mode
 			dirMode := mode.Perm() | 0o700
 			dirPath := filepath.Join(t.DestinationPath, entry.Path)
-			log.Printf("make directory %s(%s)", dirPath, dirMode)
 			if err := os.MkdirAll(dirPath, dirMode); err != nil {
 				log.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
-			} else {
-				log.Printf("directory %s(%s) created", dirPath, dirMode)
 			}
 		} else if mode.IsRegular() || (mode&fs.ModeSymlink != 0) {
 			if addSep {
-				if err := w.WriteByte('\n'); err != nil {
-					log.Printf("failed to write buffer :%v", err)
-				}
+				_ = w.WriteByte('\n')
 			} else {
 				addSep = true
 			}
 
-			if _, err := w.WriteString(entry.Path); err != nil {
-				log.Printf("failed to write buffer :%v", err)
-			}
-			if err := w.Flush(); err != nil {
-				log.Printf("failed to flush buffer :%v", err)
-			}
+			_, _ = w.WriteString(entry.Path)
+			_ = w.Flush()
 		}
 	}
 
 }
 
-func (t *Task) handleRsyncStdout(pid int, reader io.Reader, totalFiles int, closeChan chan<- struct{}) {
+func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []common.Fileinfo, closeChan chan struct{}) {
 	defer close(closeChan)
 
-	prefix := fmt.Sprintf("[%d]&1> ", pid)
+	prefix := fmt.Sprintf("[%d]&1> ", res.pid)
 	scanner := bufio.NewScanner(reader)
 
-	if totalFiles == 0 {
+	if len(fileList) == 0 {
 		for scanner.Scan() {
 			line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
 			log.Print(prefix, line)
 		}
 		return
-	} else {
-		result := result{}
-		result.total = totalFiles
-		defer func() {
-			log.Print(result.String())
-		}()
+	}
 
-		for scanner.Scan() {
-			line := bytes.TrimRightFunc(scanner.Bytes(), unicode.IsSpace)
-			if len(line) == 0 {
-				continue
-			}
+	filenameSet := make(map[string]int)
+	for idx, info := range fileList {
+		filenameSet[info.Path] = idx
+	}
 
-			matched := rsyncUptodateFormat.FindSubmatchIndex(line)
-			groups := (len(matched) / 2) - 1
-			if groups < 0 {
-				log.Print(prefix, line)
-				continue
-			}
+	bar := progressbar.NewOptions(res.total,
+		progressbar.OptionSetWriter(common.LogWriter{}),
+		progressbar.OptionShowElapsedTimeOnFinish(),
+		progressbar.OptionShowCount(),
+		progressbar.OptionShowIts(),
+		progressbar.OptionSetWidth(15),
+		progressbar.OptionSetPredictTime(false),
+		progressbar.OptionThrottle(time.Second),
+		progressbar.OptionSetItsString("op"),
+		progressbar.OptionSetDescription(fmt.Sprintf("[%d]", res.pid)),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "-",
+			SaucerHead:    ">",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}))
+	defer bar.Close()
 
-			match := func(i int) []byte {
-				if len(matched) < (i+1)*2 {
-					return nil
-				}
+	for scanner.Scan() {
+		line := bytes.TrimRightFunc(scanner.Bytes(), unicode.IsSpace)
+		if len(line) == 0 {
+			continue
+		}
+
+		matched := rsyncUptodateFormat.FindSubmatchIndex(line)
+		groups := (len(matched) / 2) - 1
+		if groups < 0 {
+			log.Print(prefix, line)
+			continue
+		}
+		bar.Add(1)
+
+		match := func(i int) []byte {
+			if len(matched) < (i+1)*2 {
+				return nil
+			} else if matched[i*2] < 0 || matched[i*2+1] < 0 {
+				return nil
+			} else {
 				return line[matched[i*2]:matched[i*2+1]]
 			}
-
-			result.appendFilename(match(1))
-
-			if groups < 2 {
-				result.uptodate++
+		}
+		path := string(bytes.TrimSpace(match(1)))
+		if idx, contains := filenameSet[path]; !contains {
+			res.processing++
+			continue
+		} else {
+			res.appendFilename(path)
+			if len(match(2)) == 0 {
+				info := fileList[idx]
+				res.sent++
+				res.sentBytes += info.Size
 			} else {
-				result.sent++
+				res.uptodate++
 			}
 		}
 	}
@@ -178,16 +192,7 @@ func (t *Task) handleRsyncStderr(pid int, reader io.Reader, closeChan chan<- str
 	}
 }
 
-func (t *Task) execute(parentCtx context.Context, fileList []common.Fileinfo) (err error) {
-	ctx, cancel := context.WithCancel(parentCtx)
-	defer cancel()
-
-	retryable := false
-	defer func() {
-		if err != nil && !retryable {
-			err = retry.Unrecoverable(err)
-		}
-	}()
+func (t *Task) execute(ctx context.Context, fileList []common.Fileinfo) error {
 	invoke := exec.CommandContext(
 		ctx,
 		"rsync",
@@ -199,23 +204,19 @@ func (t *Task) execute(parentCtx context.Context, fileList []common.Fileinfo) (e
 	stdout, _ := invoke.StdoutPipe()
 	stderr, _ := invoke.StderrPipe()
 
-	err = invoke.Start()
-	if err != nil {
-		err = fmt.Errorf("failed to start process(rsync): %w", err)
-		return
+	if err := invoke.Start(); err != nil {
+		return fmt.Errorf("failed to start process(rsync): %w", err)
 	}
-	started := time.Now()
-	pid := invoke.Process.Pid
+	res := &result{total: len(fileList), started: time.Now(), pid: invoke.Process.Pid}
+
 	stdinClosed := make(chan struct{})
 	go t.handleRsyncStdin(stdin, stdinClosed, fileList)
 
 	stdoutClosed := make(chan struct{})
-	go t.handleRsyncStdout(pid, stdout, len(fileList), stdoutClosed)
+	go t.handleRsyncStdout(res, stdout, fileList, stdoutClosed)
 
 	stderrClosed := make(chan struct{})
-	go t.handleRsyncStderr(pid, stderr, stderrClosed)
-
-	log.Printf("rsync started(%d)", pid)
+	go t.handleRsyncStderr(res.pid, stderr, stderrClosed)
 
 	<-stdinClosed
 
@@ -226,21 +227,7 @@ func (t *Task) execute(parentCtx context.Context, fileList []common.Fileinfo) (e
 		<-stdoutClosed
 	}
 
-	exitcode := 0
-	err = invoke.Wait()
-	ended := time.Now()
-	if err != nil {
-		// try to get the exit code
-		if exitError, ok := err.(*exec.ExitError); ok {
-			ws := exitError.Sys().(syscall.WaitStatus)
-			exitcode = ws.ExitStatus()
-		} else {
-			exitcode = -1
-		}
-	}
-
-	log.Printf("rsync(%d) exit code is %d in %2.2f ms", pid, exitcode, float32(ended.Sub(started).Microseconds())/1000)
-
-	err, retryable = isExitedNormally(exitcode, err)
-	return
+	res.err = invoke.Wait()
+	log.Print(res)
+	return res.HandleError()
 }
