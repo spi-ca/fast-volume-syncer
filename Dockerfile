@@ -8,8 +8,7 @@ FROM public.ecr.aws/docker/library/golang:1.20.4 AS build
 WORKDIR /build
 
 COPY internal internal/
-COPY main.go selector.go syncer.go cmd/
-COPY go.mod go.sum ./
+COPY main.go selector.go syncer.go go.mod go.sum ./
 
 RUN set -xe && \
     go mod download && \
