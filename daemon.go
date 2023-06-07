@@ -9,9 +9,43 @@ import (
 )
 
 func daemonStopEntry() {
+	// todo stop function
+	// todo pid file
 }
 
 func daemonStartEntry() {
+
+	log.Print("args:")
+	log.Print("	pid.file=", viper.GetString("pid.file"))
+	log.Print("	log.file=", viper.GetString("log.file"))
+	log.Print("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
+	log.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
+	log.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
+	log.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
+	log.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
+	log.Print("	rsync.special=", viper.GetBool("rsync.special"))
+	log.Print("	rsync.compress=", viper.GetBool("rsync.compress"))
+	log.Print("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
+	log.Print("	rsync.inplace=", viper.GetBool("rsync.inplace"))
+	log.Print("	rsync.recursive=", viper.GetBool("rsync.recursive"))
+	log.Print("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
+	log.Print("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
+	log.Print("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
+	log.Print("	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"))
+	log.Print("	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"))
+	log.Print("	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"))
+	log.Print("	scan.deadline=", viper.GetDuration("scan.deadline"))
+	log.Print("	scan.find.path=", viper.GetString("scan.find.path"))
+	log.Print("	worker.size=", viper.GetString("worker.size"))
+	log.Print("	task.size=", viper.GetInt("task.size"))
+	log.Print("	chunk.size=", viper.GetInt("chunk.size"))
+	log.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
+	log.Print("	retry.delay=", viper.GetDuration("retry.delay"))
+	log.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
+	log.Print("	retry.max.jiiter=", viper.GetDuration("retry.max.jiiter"))
+	log.Print("	sandboxSupported=", sandboxSupported)
+	log.Print("---")
+
 	runner := selector.Daemonizer{
 		NodeSelector:    argNodeSelector,
 		CopyInfoCSVPath: argCopyInfoFilePath,

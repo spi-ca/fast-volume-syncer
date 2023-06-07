@@ -18,7 +18,7 @@ import (
 const (
 	name                = "fast-volume-syncer"
 	defaultNodeSelector = -1
-	defaultCSVFilename  = "copy-info.csv"
+	defaultCSVFilename  = "data/09_copy_entries.csv"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 )
 
 func init() {
-	flags.String("log-file", fmt.Sprintf("logs/%s.log", name), "(daemon only)specify a log file")
+	flags.String("log-file", fmt.Sprintf("log/%s.log", name), "(daemon only)specify a log file")
 	flags.Bool("sandbox-disabled", false, "(selector only)without namespace isolation")
 	flags.IntP("worker-size", "w", 5, "(selector only)specifies the maximum number of syncer processes that can run concurrently")
 
@@ -61,7 +61,7 @@ func init() {
 	flags.String("dst-storage-mount-option", "rw,nodiratime,noatime,vers=3,rsize=524288,wsize=524288,hard,nolock,proto=tcp,timeo=600,retrans=2,sec=sys", "destination mount option")
 	flags.String("dst-storage-mount-name", "dst", "destination mountpoint name e.g. /tmp/rand_path/*dst*")
 	flags.Duration("scan-deadline", 3*time.Second, "scanning output deadline")
-	flags.String("scan-find-path", "./find", "specify find binary path, or use golang implementation")
+	flags.String("scan-find-path", "find", "specify find binary path, or use golang implementation")
 	flags.IntP("task-size", "t", 30, "specifies the maximum number of rsync processes that can run concurrently")
 	flags.IntP("chunk-size", "c", 4000, "specifies how many files rsync will write at once")
 	flags.Int("retry-attempts", 7, "specifies the maximum number of retries. less than or equal to 0 means no retries.")
