@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 	"unicode"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
@@ -24,27 +23,14 @@ var (
 )
 
 type Runner struct {
-	Sandboxed          bool
-	SandboxMountOption string
+	Sandboxed bool
+	Common    common.Template
 
-	Args rsync.Args
+	SourceMountPath    string
+	SourceMountSubPath string
 
-	Source          common.RemoteInfo
-	SourceMountName string
-
-	Destination          common.RemoteInfo
-	DestinationMountName string
-
-	ScanDuration     time.Duration
-	FinderBinaryPath string
-
-	TaskSize  int
-	ChunkSize int
-
-	RetryAttempts  int
-	RetryDelay     time.Duration
-	RetryMaxDelay  time.Duration
-	RetryMaxJitter time.Duration
+	DestinationMountPath    string
+	DestinationMountSubPath string
 }
 
 func (r *Runner) logLineByLine(reader io.Reader, prefix string) {
@@ -81,12 +67,12 @@ func (r *Runner) logVolumeInfo(path string) {
 }
 
 func (r *Runner) locateFindBinary() string {
-	if len(r.FinderBinaryPath) < 1 {
+	if len(r.Common.FinderBinaryPath) < 1 {
 		return ""
 	}
 
-	if foundPath, err := exec.LookPath(r.FinderBinaryPath); err != nil {
-		log.Printf("find path(%s) not found", r.FinderBinaryPath)
+	if foundPath, err := exec.LookPath(r.Common.FinderBinaryPath); err != nil {
+		log.Printf("find path(%s) not found", r.Common.FinderBinaryPath)
 		return ""
 	} else {
 		absPath, _ := filepath.Abs(foundPath)
@@ -95,7 +81,7 @@ func (r *Runner) locateFindBinary() string {
 }
 func (r *Runner) prepareDirectory() (string, string, string, error) {
 	if r.Sandboxed {
-		if err := common.Sandbox(r.SandboxMountOption); err != nil {
+		if err := common.Sandbox(r.Common.SandboxMountOption); err != nil {
 			return "", "", "", fmt.Errorf("failed to sanxbox a process: %w", err)
 		}
 	}
@@ -115,21 +101,36 @@ func (r *Runner) prepareDirectory() (string, string, string, error) {
 	// 이제 tempDir가 cwd이다.
 
 	// host:path -> {tempdir}/mountName
-	srcMountPath := filepath.Join(tempDir, r.SourceMountName)
-	dstMountPath := filepath.Join(tempDir, r.DestinationMountName)
-
-	if err = common.Mount(r.Source.MountInfo, srcMountPath); err != nil {
-		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", r.Source.MountInfo, srcMountPath, err)
+	srcMountPath := filepath.Join(tempDir, r.Common.SourceMountName)
+	dstMountPath := filepath.Join(tempDir, r.Common.DestinationMountName)
+	srcMountInfo := common.RemoteInfo{
+		MountInfo: common.MountInfo{
+			Host:    r.Common.SourceMountHost,
+			Path:    r.SourceMountPath,
+			Options: r.Common.SourceMountOptions,
+		},
+		SubPath: r.SourceMountSubPath,
 	}
-	log.Printf("source mount success!(%s %s)", r.Source.MountInfo, srcMountPath)
-
-	if err = common.Mount(r.Destination.MountInfo, dstMountPath); err != nil {
-		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", r.Destination.MountInfo, dstMountPath, err)
+	dstMountInfo := common.RemoteInfo{
+		MountInfo: common.MountInfo{
+			Host:    r.Common.DestinationMountHost,
+			Path:    r.DestinationMountPath,
+			Options: r.Common.DestinationMountOptions,
+		},
+		SubPath: r.DestinationMountSubPath,
 	}
-	log.Printf("destination mount success!(%s %s)", r.Destination.MountInfo, dstMountPath)
+	if err = common.Mount(srcMountInfo.Source(), srcMountPath, srcMountInfo.Type(), srcMountInfo.RefinedOptions()); err != nil {
+		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", dstMountInfo, srcMountPath, err)
+	}
+	log.Printf("source mount success!(%s %s)", srcMountInfo, srcMountPath)
 
-	srcMountSubPath := filepath.Join(srcMountPath, r.Source.SubPath)
-	dstMountSubPath := filepath.Join(dstMountPath, r.Destination.SubPath)
+	if err = common.Mount(dstMountInfo.Source(), dstMountPath, dstMountInfo.Type(), dstMountInfo.RefinedOptions()); err != nil {
+		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", dstMountInfo, dstMountPath, err)
+	}
+	log.Printf("destination mount success!(%s %s)", srcMountInfo, dstMountPath)
+
+	srcMountSubPath := filepath.Join(srcMountPath, srcMountInfo.SubPath)
+	dstMountSubPath := filepath.Join(dstMountPath, dstMountInfo.SubPath)
 
 	// source 확인
 	sourceStat, err := os.Stat(srcMountSubPath)
@@ -154,8 +155,8 @@ func (r *Runner) cleanupDirectory(tempPath string) {
 		return
 	}
 
-	srcMountPath := filepath.Join(tempPath, r.SourceMountName)
-	dstMountPath := filepath.Join(tempPath, r.DestinationMountName)
+	srcMountPath := filepath.Join(tempPath, r.Common.SourceMountName)
+	dstMountPath := filepath.Join(tempPath, r.Common.DestinationMountName)
 
 	umountPaths := []string{srcMountPath, dstMountPath}
 	removePaths := []string{srcMountPath, dstMountPath, tempPath}
@@ -180,7 +181,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 		return err
 	}
 
-	log.Printf("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.TaskSize, r.ChunkSize, srcPath, dstPath)
+	log.Printf("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
 
 	r.logVolumeInfo(srcPath)
 	r.logVolumeInfo(dstPath)
@@ -188,27 +189,27 @@ func (r *Runner) Execute(ctx context.Context) error {
 	log.Print("=> split rsync")
 
 	rsyncInvoker := rsync.Task{
-		Arguments:       r.Args.Assemble(srcPath, dstPath),
-		RetryAttempts:   r.RetryAttempts,
-		RetryDelay:      r.RetryDelay,
-		RetryMaxDelay:   r.RetryMaxDelay,
-		RetryMaxJitter:  r.RetryMaxJitter,
+		Arguments:       r.Common.Args.Assemble(srcPath, dstPath),
+		RetryAttempts:   r.Common.RetryAttempts,
+		RetryDelay:      r.Common.RetryDelay,
+		RetryMaxDelay:   r.Common.RetryMaxDelay,
+		RetryMaxJitter:  r.Common.RetryMaxJitter,
 		DestinationPath: dstPath,
 	}
 
-	if r.Args.Recursive {
+	if r.Common.Args.Recursive {
 		return rsyncInvoker.Execute(ctx, nil)
 	}
 
 	scanner := find.Scanner{
 		FinderBinaryPath: finderBinaryPath,
-		TaskSize:         r.TaskSize,
-		ChunkSize:        r.ChunkSize,
+		TaskSize:         r.Common.TaskSize,
+		ChunkSize:        r.Common.ChunkSize,
 	}
 
 	entryRecvChan := scanner.Scan(ctx, srcPath)
 
-	joiner := newChunkJoiner(r.TaskSize, r.ChunkSize, r.ScanDuration, &rsyncInvoker)
+	joiner := newChunkJoiner(r.Common.TaskSize, r.Common.ChunkSize, r.Common.ScanDuration, &rsyncInvoker)
 
 	err = joiner.Execute(ctx, entryRecvChan)
 	if err == nil && ctx.Err() == nil {

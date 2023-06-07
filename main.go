@@ -18,7 +18,7 @@ import (
 const (
 	name                = "fast-volume-syncer"
 	defaultNodeSelector = -1
-	defaultCSVFilename  = "09_copy_entries.csv"
+	defaultCSVFilename  = "copy-info.csv"
 )
 
 var (
@@ -38,7 +38,13 @@ var (
 )
 
 func init() {
+	flags.String("log-file", fmt.Sprintf("logs/%s.log", name), "(daemon only)specify a log file")
 	flags.Bool("sandbox-disabled", false, "(selector only)without namespace isolation")
+	flags.IntP("worker-size", "w", 5, "(selector only)specifies the maximum number of syncer processes that can run concurrently")
+
+	// todo pid file
+	//flags.String("pid-file", fmt.Sprintf("%s.pid", name), "(daemon only)specify a pid file")
+
 	flags.String("sandbox-mount-option", "size=150M,mode=700,nosuid,noexec,nodev", "(selector only)sandbox mount option")
 	flags.Bool("rsync-verbose", false, "make rsync verbosely")
 	flags.Bool("rsync-perms", false, "preserve source file mode")
@@ -56,7 +62,6 @@ func init() {
 	flags.String("dst-storage-mount-name", "dst", "destination mountpoint name e.g. /tmp/rand_path/*dst*")
 	flags.Duration("scan-deadline", 3*time.Second, "scanning output deadline")
 	flags.String("scan-find-path", "./find", "specify find binary path, or use golang implementation")
-	flags.IntP("worker-size", "w", 5, "(selector only)specifies the maximum number of syncer processes that can run concurrently")
 	flags.IntP("task-size", "t", 30, "specifies the maximum number of rsync processes that can run concurrently")
 	flags.IntP("chunk-size", "c", 4000, "specifies how many files rsync will write at once")
 	flags.Int("retry-attempts", 7, "specifies the maximum number of retries. less than or equal to 0 means no retries.")
@@ -95,7 +100,7 @@ func init() {
 			fmt.Println("required arguments missing")
 			usage()
 		}
-	case "select":
+	case "select", "start":
 		switch flags.NArg() {
 		case consumedArgs:
 			argNodeSelector = defaultNodeSelector
@@ -135,6 +140,10 @@ func main() {
 		syncerEntry()
 	case "select":
 		selectorEntry()
+	case "start":
+		daemonStartEntry()
+	case "stop":
+		daemonStopEntry()
 	default:
 		usage()
 	}
@@ -144,8 +153,13 @@ func main() {
 func usage() {
 	fmt.Printf("usage: \n"+
 		"\t%s sync SRC_PATH [SRC_SUBPATH] DST_PATH [DST_SUBPATH]\n"+
-		"\t%s select [NODE_SELECTOR:%d] [COPY_INFO_CSV_PATH:%s]\nargs:\n",
-		name, name, defaultNodeSelector, defaultCSVFilename,
+		"\t%s select [NODE_SELECTOR:%d] [COPY_INFO_CSV_PATH:%s]\n"+
+		"\t%s start [NODE_SELECTOR:%d] [COPY_INFO_CSV_PATH:%s]\n"+
+		"\t%s stop \nargs:\n",
+		name,
+		name, defaultNodeSelector, defaultCSVFilename,
+		name, defaultNodeSelector, defaultCSVFilename,
+		name,
 	)
 	flags.PrintDefaults()
 	os.Exit(1)

@@ -6,12 +6,9 @@ package common
 import (
 	"fmt"
 	"github.com/moby/sys/mount"
-	"golang.org/x/sys/unix"
 	"log"
 	"os"
-	"reflect"
 	"syscall"
-	"unsafe"
 )
 
 func Sandbox(sandboxMountOption string) error {
@@ -51,13 +48,13 @@ func Sandbox(sandboxMountOption string) error {
 	return nil
 }
 
-func Mount(info MountInfo, destinationPath string) (err error) {
+func Mount(source string, destinationPath string, mountType string, mountOptions string) (err error) {
 	err = os.Mkdir(destinationPath, 0o755)
 	if err != nil {
 		return fmt.Errorf("failed to make a directory(%s): %w", destinationPath, err)
 	}
 
-	err = mount.Mount(info.Source(), destinationPath, info.Type(), info.RefinedOptions())
+	err = mount.Mount(source, destinationPath, mountType, mountOptions)
 	if err != nil {
 		return fmt.Errorf("failed to mount %s : %w", destinationPath, err)
 	}
@@ -72,32 +69,7 @@ func RecursiveUmounts(destinationPath string) error {
 	return mount.RecursiveUnmount(destinationPath)
 }
 
-func Self(sanboxed bool) (string, *syscall.SysProcAttr) {
-	path := "/proc/self/exe"
-	attr := &syscall.SysProcAttr{
-		Pdeathsig: unix.SIGTERM,
-	}
-
-	if sanboxed {
-		attr.Unshareflags |= syscall.CLONE_NEWNS | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_FS
-	}
-	return path, attr
-}
-
-func SetProcessName(name string) error {
-	bytes := append([]byte(name), 0)
-
-	argv0str := (*reflect.StringHeader)(unsafe.Pointer(&os.Args[0]))
-	argv0 := (*[1 << 30]byte)(unsafe.Pointer(argv0str.Data))[:argv0str.Len]
-
-	n := copy(argv0, bytes)
-	if n < len(argv0) {
-		argv0[n] = 0
-	}
-
-	ptr := unsafe.Pointer(&bytes[0])
-	if _, _, errno := syscall.RawSyscall6(syscall.SYS_PRCTL, syscall.PR_SET_NAME, uintptr(ptr), 0, 0, 0, 0); errno != 0 {
-		return errno
-	}
+func ApplySandboxFlags(attr *syscall.SysProcAttr) error {
+	attr.Unshareflags |= syscall.CLONE_NEWNS | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_FS
 	return nil
 }

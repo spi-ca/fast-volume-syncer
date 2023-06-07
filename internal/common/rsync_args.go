@@ -1,6 +1,6 @@
-package rsync
+package common
 
-type Args struct {
+type RsyncArgs struct {
 	Verbose            bool
 	PreservePermission bool
 	PreserveOwnership  bool
@@ -11,7 +11,7 @@ type Args struct {
 	Recursive          bool
 }
 
-func (a *Args) Assemble(src, dst string) []string {
+func (a *RsyncArgs) Assemble(src, dst string) []string {
 	args := []string{
 		"--links",
 		"--hard-links",

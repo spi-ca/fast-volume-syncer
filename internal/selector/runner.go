@@ -121,7 +121,6 @@ func (r *Runner) Execute(ctx context.Context) error {
 	var f io.Reader
 	if r.CopyInfoCSVPath == "-" {
 		f = io.NopCloser(os.Stdout)
-
 	} else if rawFile, err := os.OpenFile(r.CopyInfoCSVPath, os.O_RDONLY, 0o666); err != nil {
 		return err
 	} else {
