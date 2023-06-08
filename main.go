@@ -129,22 +129,41 @@ func main() {
 		}
 		entry.Selector(sandboxSupported, nodeSelector, copyInfoFilePath)
 	case "start":
-		entry.DaemonStart()
+		var (
+			nodeSelector     = defaultNodeSelector
+			copyInfoFilePath = defaultCSVFilename
+		)
+		switch flags.NArg() {
+		case consumedArgs:
+			consumedArgs += 0
+		case consumedArgs + 1:
+			if rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0)); err == nil {
+				nodeSelector = rawNodeSelector
+			} else {
+				fmt.Println("failed to parse nodeSelector:%w", err)
+				usage()
+			}
+			consumedArgs += 1
+		case consumedArgs + 2:
+			if rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0)); err == nil {
+				nodeSelector = rawNodeSelector
+			} else {
+				fmt.Println("failed to parse nodeSelector:%w", err)
+				usage()
+			}
+			copyInfoFilePath = flags.Arg(consumedArgs + 1)
+			consumedArgs += 2
+		default:
+			fmt.Println("required arguments missing")
+			usage()
+		}
+		entry.DaemonStart(sandboxSupported, nodeSelector, copyInfoFilePath)
 	case "stop":
+		entry.DaemonStop()
 	default:
 		fmt.Printf("invalid action %s\n", action)
 		usage()
 	}
-	switch argAction {
-	case "sync":
-	case "select":
-	case "start":
-	case "stop":
-		entry.DaemonStop()
-	default:
-		usage()
-	}
-
 }
 
 func usage() {

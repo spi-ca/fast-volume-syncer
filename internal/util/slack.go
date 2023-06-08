@@ -61,7 +61,11 @@ func (s *slackSender) Send(message string) {
 	if s.messageChan == nil {
 		return
 	}
-	s.messageChan <- message
+	select {
+	case s.messageChan <- message:
+	default:
+		ErrLog.Printf("cannot send a message(%s): too many messages in queue(%d)", message, len(s.messageChan))
+	}
 }
 
 func (s *slackSender) Start() {

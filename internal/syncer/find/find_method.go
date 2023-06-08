@@ -119,13 +119,7 @@ func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reade
 	}
 }
 
-func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) {
-	defer func() {
-		if err := recover(); err != nil {
-			util.SendSlackMessage(fmt.Sprintf("panic on Scanner.executeFind : %v", err))
-		}
-	}()
-
+func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) error {
 	invoke := exec.CommandContext(
 		ctx,
 		s.FinderBinaryPath,
@@ -139,8 +133,7 @@ func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- r
 	stderr, _ := invoke.StderrPipe()
 
 	if err := invoke.Start(); err != nil {
-		util.ErrLog.Printf("failed to start process(find): %v", err)
-		return
+		return fmt.Errorf("failed to start process(find): %w", err)
 	}
 	started := time.Now()
 	res := &returns.ExecutionResult{PID: invoke.Process.Pid}
@@ -163,9 +156,6 @@ func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- r
 	res.Err = invoke.Wait()
 	ended := time.Now()
 
-	if err := res.HandleError(); err != nil {
-		util.ErrLog.Printf("find(%d) ended in %2.2f ms, %v", res.PID, float32(ended.Sub(started).Microseconds())/1000, err)
-	} else {
-		util.InfoLog.Printf("find(%d) ended in %2.2f ms", &res, float32(ended.Sub(started).Microseconds())/1000)
-	}
+	util.InfoLog.Printf("find(%d) ended in %2.2f ms", &res, float32(ended.Sub(started).Microseconds())/1000)
+	return res.HandleError()
 }

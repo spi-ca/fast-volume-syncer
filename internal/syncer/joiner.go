@@ -15,7 +15,7 @@ type chunkJoiner struct {
 	wg  sync.WaitGroup
 	sem chan bool
 
-	errorChan chan error
+	entryRecvChan <-chan returns.Fileinfo
 
 	chunkPool sync.Pool
 
@@ -23,36 +23,18 @@ type chunkJoiner struct {
 	scanDuration time.Duration
 }
 
-func newChunkJoiner(
-	taskSize int, chunkSize int,
-	scanDuration time.Duration,
-	invoker *rsync.Task,
-) *chunkJoiner {
-	return &chunkJoiner{
-		sem: make(chan bool, taskSize),
-
-		errorChan: make(chan error, taskSize),
-
-		invoker: invoker,
-		chunkPool: sync.Pool{
-			New: func() interface{} {
-				return make([]returns.Fileinfo, 0, chunkSize)
-			},
-		},
-		scanDuration: scanDuration,
-	}
-}
-func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.Fileinfo) error {
-	go c.dispatchChunks(ctx, entryRecvChan)
+func (c *chunkJoiner) Execute(ctx context.Context) error {
+	errorChan := make(chan error, len(c.sem))
+	go c.dispatch(ctx, errorChan)
 
 	var errs []error
-	for err := range c.errorChan {
+	for err := range errorChan {
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
 }
 
-func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-chan returns.Fileinfo) {
+func (c *chunkJoiner) dispatch(parentCtx context.Context, errorChan chan<- error) {
 	ended := false
 	deadline := time.NewTicker(c.scanDuration)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -61,7 +43,7 @@ func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-
 			util.ErrLog.Printf("panic on chunkJoiner: %v", err)
 		}
 		c.wg.Wait()
-		close(c.errorChan)
+		close(errorChan)
 		cancel()
 		deadline.Stop()
 	}()
@@ -76,7 +58,7 @@ func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-
 				c.chunkPool.Put(chunk[0:0])
 			}
 			continue
-		case entry, ok := <-entryRecvChan:
+		case entry, ok := <-c.entryRecvChan:
 			if !ok {
 				ended = true
 				break
@@ -99,7 +81,7 @@ func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-
 		if len(chunk) > 0 {
 			c.wg.Add(1)
 			c.sem <- true
-			go c.submit(ctx, chunk)
+			go c.submit(ctx, chunk, errorChan)
 			chunk = nil
 		}
 		if ended {
@@ -108,7 +90,7 @@ func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-
 	}
 }
 
-func (c *chunkJoiner) submit(ctx context.Context, chunk []returns.Fileinfo) {
+func (c *chunkJoiner) submit(ctx context.Context, chunk []returns.Fileinfo, errorChan chan<- error) {
 	defer func() {
 		<-c.sem
 		c.wg.Done()
@@ -116,6 +98,6 @@ func (c *chunkJoiner) submit(ctx context.Context, chunk []returns.Fileinfo) {
 	}()
 	err := c.invoker.Execute(ctx, chunk)
 	if err != nil {
-		c.errorChan <- err
+		errorChan <- err
 	}
 }

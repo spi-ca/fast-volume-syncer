@@ -12,19 +12,14 @@ type workerJoiner struct {
 	wg  sync.WaitGroup
 	sem chan bool
 
+	entryRecvChan <-chan copyEntry
+
 	invoker *Invoker
 }
 
-func newWorkerJoiner(workerSize int, invoker *Invoker) *workerJoiner {
-	return &workerJoiner{
-		sem:     make(chan bool, workerSize),
-		invoker: invoker,
-	}
-}
-
-func (c *workerJoiner) Execute(ctx context.Context, entryRecvChan <-chan copyEntry) error {
+func (c *workerJoiner) Execute(ctx context.Context) error {
 	errorChan := make(chan error, len(c.sem))
-	go c.dispatch(ctx, entryRecvChan, errorChan)
+	go c.dispatch(ctx, errorChan)
 
 	var errs []error
 	for err := range errorChan {
@@ -33,7 +28,7 @@ func (c *workerJoiner) Execute(ctx context.Context, entryRecvChan <-chan copyEnt
 	return errors.Join(errs...)
 }
 
-func (c *workerJoiner) dispatch(parentCtx context.Context, entryRecvChan <-chan copyEntry, errorChan chan<- error) {
+func (c *workerJoiner) dispatch(parentCtx context.Context, errorChan chan<- error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		if err := recover(); err != nil {
@@ -49,7 +44,7 @@ func (c *workerJoiner) dispatch(parentCtx context.Context, entryRecvChan <-chan 
 		case <-parentCtx.Done():
 			// 종료시 남은 항목은 무시한다.
 			return
-		case entry, ok := <-entryRecvChan:
+		case entry, ok := <-c.entryRecvChan:
 			if !ok {
 				return
 			}
@@ -65,7 +60,7 @@ func (c *workerJoiner) submit(ctx context.Context, entry copyEntry, errorChan ch
 		<-c.sem
 		c.wg.Done()
 	}()
-	if err := c.invoker.Run(ctx, entry); err != nil {
+	if err := c.invoker.Run(ctx, entry.SourceVolume, entry.SourcePath, entry.DestinationVolume, entry.DestinationPath); err != nil {
 		errorChan <- err
 	}
 }

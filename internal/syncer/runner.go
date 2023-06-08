@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"unicode"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
@@ -33,6 +34,55 @@ type Runner struct {
 
 	DestinationMountPath    string
 	DestinationMountSubPath string
+}
+
+func (r *Runner) Execute(ctx context.Context) error {
+	// chdir 영향으로 미리 발견하여야 된다.
+	finderBinaryPath := r.locateFindBinary()
+
+	tempPath, srcPath, dstPath, err := r.prepareDirectory()
+	defer r.cleanupDirectory(tempPath)
+	if err != nil {
+		return err
+	}
+
+	util.InfoLog.Printf("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
+
+	r.logVolumeInfo(srcPath)
+	r.logVolumeInfo(dstPath)
+
+	util.InfoLog.Print("=> split rsync")
+
+	entryChan := make(chan returns.Fileinfo, r.Common.TaskSize*r.Common.ChunkSize)
+	util.InfoLog.Printf("chunk size is %d", r.Common.ChunkSize)
+
+	scanner := find.Scanner{FinderBinaryPath: finderBinaryPath}
+	go scanner.Scan(ctx, srcPath, entryChan)
+
+	joiner := &chunkJoiner{
+		sem: make(chan bool, r.Common.TaskSize),
+		invoker: &rsync.Task{
+			Arguments:       r.Common.Args.Assemble(srcPath, dstPath),
+			Retry:           r.Common.Retry,
+			DestinationPath: dstPath,
+		},
+		entryRecvChan: entryChan,
+		chunkPool: sync.Pool{
+			New: func() any {
+				return make([]returns.Fileinfo, 0, r.Common.ChunkSize)
+			},
+		},
+		scanDuration: r.Common.ScanDuration,
+	}
+
+	err = joiner.Execute(ctx)
+	if err == nil && ctx.Err() == nil {
+		r.logVolumeInfo(srcPath)
+		r.logVolumeInfo(dstPath)
+		util.InfoLog.Printf("볼륨 싱크 완료(%s->%s)", srcPath, dstPath)
+	}
+	return err
+
 }
 
 func (r *Runner) logLineByLine(reader io.Reader, prefix string) {
@@ -175,50 +225,4 @@ func (r *Runner) cleanupDirectory(tempPath string) {
 			util.ErrLog.Printf("failed to remove %s: %s", path, err)
 		}
 	}
-}
-func (r *Runner) Execute(ctx context.Context) error {
-	// chdir 영향으로 미리 발견하여야 된다.
-	finderBinaryPath := r.locateFindBinary()
-
-	tempPath, srcPath, dstPath, err := r.prepareDirectory()
-	defer r.cleanupDirectory(tempPath)
-	if err != nil {
-		return err
-	}
-
-	util.InfoLog.Printf("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
-
-	r.logVolumeInfo(srcPath)
-	r.logVolumeInfo(dstPath)
-
-	util.InfoLog.Print("=> split rsync")
-
-	rsyncInvoker := rsync.Task{
-		Arguments:       r.Common.Args.Assemble(srcPath, dstPath),
-		Retry:           r.Common.Retry,
-		DestinationPath: dstPath,
-	}
-
-	if r.Common.Args.Recursive {
-		return rsyncInvoker.Execute(ctx, nil)
-	}
-
-	scanner := find.Scanner{
-		FinderBinaryPath: finderBinaryPath,
-		TaskSize:         r.Common.TaskSize,
-		ChunkSize:        r.Common.ChunkSize,
-	}
-
-	entryRecvChan := scanner.Scan(ctx, srcPath)
-
-	joiner := newChunkJoiner(r.Common.TaskSize, r.Common.ChunkSize, r.Common.ScanDuration, &rsyncInvoker)
-
-	err = joiner.Execute(ctx, entryRecvChan)
-	if err == nil && ctx.Err() == nil {
-		r.logVolumeInfo(srcPath)
-		r.logVolumeInfo(dstPath)
-		util.InfoLog.Printf("볼륨 싱크 완료(%s->%s)", srcPath, dstPath)
-	}
-	return err
-
 }

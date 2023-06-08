@@ -40,10 +40,9 @@ func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
 	if t.Retry.Attempts <= 0 {
 		return t.execute(ctx, fileList)
 	}
-	return retry.Do(
-		func() error { return t.execute(ctx, fileList) },
-		t.Retry.Assemble(ctx)...,
-	)
+	retryOptionArgs := t.Retry.Assemble(ctx)
+	retryFunc := func() error { return t.execute(ctx, fileList) }
+	return retry.Do(retryFunc, retryOptionArgs...)
 }
 
 func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}, fileList []returns.Fileinfo) {

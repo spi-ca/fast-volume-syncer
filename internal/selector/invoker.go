@@ -25,19 +25,48 @@ type Invoker struct {
 	Common args.SyncerCommonArguments
 }
 
-func (i *Invoker) Run(ctx context.Context, entry copyEntry) error {
+func (i *Invoker) Run(ctx context.Context, srcPath, srcSubpath, dstPath, dstSubpath string) error {
+	invoke := exec.CommandContext(ctx, sys.Executable(), "sync", srcPath, srcSubpath, dstPath, dstSubpath)
+	invoke.Env = i.assembleEnvironment(os.Environ())
+	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
+	if !i.SandboxDisabled {
+		if err := sys.IsolateMountNamespaceFlags(invoke.SysProcAttr); err != nil {
+			return fmt.Errorf("failed to sanxbox a process: %w", err)
+		}
+	}
+
+	stdout, _ := invoke.StdoutPipe()
+	stderr, _ := invoke.StderrPipe()
+
+	if err := invoke.Start(); err != nil {
+		return fmt.Errorf("failed to start process(rsync): %w", err)
+	}
 	started := time.Now()
-	err := i.execute(ctx, entry.SourceVolume, entry.SourcePath, entry.DestinationVolume, entry.DestinationPath)
+	res := &returns.ExecutionResult{PID: invoke.Process.Pid}
+
+	stdoutClosed := make(chan struct{})
+	go i.handleStdout(res, stdout, stdoutClosed)
+
+	stderrClosed := make(chan struct{})
+	go i.handleStderr(res, stderr, stderrClosed)
+
+	select {
+	case <-stdoutClosed:
+		<-stderrClosed
+	case <-stderrClosed:
+		<-stdoutClosed
+	}
+
+	res.Err = invoke.Wait()
 	elapsed := time.Now().Sub(started)
 
 	if err := res.HandleError(); err != nil {
 		return fmt.Errorf("selector(%d): %w", res.PID, err)
 	} else {
-		util.InfoLog.Printf("selector(%d) ended in %2.2f ms", res.PID, float32(ended.Sub(started).Microseconds())/1000)
+		util.InfoLog.Printf("selector(%d) ended in %2.2f ms", res.PID, float32(elapsed.Microseconds())/1000)
 		return nil
 	}
-
 }
 
 func (i *Invoker) assembleEnvironment(inherited []string) []string {
@@ -76,42 +105,4 @@ func (i *Invoker) handleStderr(res *returns.ExecutionResult, reader io.Reader, c
 		res.AppendLogLine(line)
 		util.ErrLog.Print(prefix, line)
 	}
-}
-
-func (i *Invoker) execute(ctx context.Context, srcPath, srcSubpath, dstPath, dstSubpath string) error {
-	invoke := exec.CommandContext(ctx, sys.Executable(), "sync", srcPath, srcSubpath, dstPath, dstSubpath)
-	invoke.Env = i.assembleEnvironment(os.Environ())
-	invoke.SysProcAttr = &syscall.SysProcAttr{}
-
-	if !i.SandboxDisabled {
-		if err := sys.IsolateMountNamespaceFlags(invoke.SysProcAttr); err != nil {
-			return fmt.Errorf("failed to sanxbox a process: %w", err)
-		}
-	}
-
-	stdout, _ := invoke.StdoutPipe()
-	stderr, _ := invoke.StderrPipe()
-
-	if err := invoke.Start(); err != nil {
-		return fmt.Errorf("failed to start process(rsync): %w", err)
-	}
-
-	res := &returns.ExecutionResult{PID: invoke.Process.Pid}
-
-	stdoutClosed := make(chan struct{})
-	go i.handleStdout(res, stdout, stdoutClosed)
-
-	stderrClosed := make(chan struct{})
-	go i.handleStderr(res, stderr, stderrClosed)
-
-	select {
-	case <-stdoutClosed:
-		<-stderrClosed
-	case <-stderrClosed:
-		<-stdoutClosed
-	}
-
-	res.Err = invoke.Wait()
-
-	return res.HandleError()
 }

@@ -43,6 +43,7 @@ func (i *Daemonizer) assembleEnvironment(inherited []string) []string {
 	}
 	return inherited
 }
+
 func (i *Daemonizer) openFiles() (*os.File, *os.File, error) {
 
 	nullFile, err := os.Open(os.DevNull)
