@@ -1,7 +1,7 @@
 //go:build !linux
 // +build !linux
 
-package util
+package system
 
 import (
 	"fmt"

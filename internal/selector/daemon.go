@@ -10,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -22,7 +22,7 @@ type Daemonizer struct {
 	WorkerSize      int
 	SandboxDisabled bool
 
-	Common model.SyncerCommonArguments
+	Common args.SyncerCommonArguments
 }
 
 func (i *Daemonizer) assembleEnvironment(inherited []string) []string {

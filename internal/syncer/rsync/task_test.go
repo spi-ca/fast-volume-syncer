@@ -9,7 +9,7 @@ import (
 
 	"github.com/schollz/progressbar/v3"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -66,7 +66,7 @@ func TestRsyncTask_Regex(t *testing.T) {
 }
 
 func TestRsyncArgs_assembleArgs(t *testing.T) {
-	args := model.RsyncArgs{
+	args := args.RsyncArgs{
 		Verbose:            false,
 		PreservePermission: false,
 		PreserveOwnership:  false,

@@ -15,7 +15,8 @@ import (
 	"time"
 	"unicode"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
+	util2 "amuz.es/src/spi-ca/fast-volume-syncer/internal/system"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -24,7 +25,7 @@ var (
 	symlinkFormat = regexp.MustCompile(`^(.*) -> (.*)$`)
 )
 
-func (s *Scanner) parseFindEntry(line []byte) (*model.Fileinfo, error) {
+func (s *Scanner) parseFindEntry(line []byte) (*returns.Fileinfo, error) {
 
 	matched := findFormat.FindSubmatchIndex(line)
 	if groups := len(matched) / 2; groups < 1 {
@@ -43,7 +44,7 @@ func (s *Scanner) parseFindEntry(line []byte) (*model.Fileinfo, error) {
 
 	//inode, _ := strconv.Atoi(match(1))
 	size := util.SimpleStrconv(match(2))
-	mode := util.UnFilemode(match(3))
+	mode := util2.UnFilemode(match(3))
 	//num_of_hardlink, _ := strconv.Atoi(match(4))
 	//owner := match(5)
 	//group := match(6)
@@ -71,14 +72,14 @@ func (s *Scanner) parseFindEntry(line []byte) (*model.Fileinfo, error) {
 		path = src
 	}
 
-	return &model.Fileinfo{
+	return &returns.Fileinfo{
 		Path: string(path),
 		Mode: mode,
 		Size: size,
 	}, nil
 }
 
-func (s *Scanner) handleFindStderr(res *model.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
+func (s *Scanner) handleFindStderr(res *returns.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
 	defer close(closeChan)
 	prefix := fmt.Sprintf("[%d]&2> ", res.PID)
 	scanner := bufio.NewScanner(reader)
@@ -89,7 +90,7 @@ func (s *Scanner) handleFindStderr(res *model.ExecutionResult, reader io.Reader,
 	}
 }
 
-func (s *Scanner) handleFindStdout(res *model.ExecutionResult, reader io.Reader, closeChan chan<- struct{}, rowChan chan<- model.Fileinfo, root string) {
+func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reader, closeChan chan<- struct{}, rowChan chan<- returns.Fileinfo, root string) {
 	defer func() {
 		close(rowChan)
 		close(closeChan)
@@ -118,7 +119,7 @@ func (s *Scanner) handleFindStdout(res *model.ExecutionResult, reader io.Reader,
 	}
 }
 
-func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- model.Fileinfo) {
+func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) {
 	defer func() {
 		if err := recover(); err != nil {
 			util.SendSlackMessage(fmt.Sprintf("panic on Scanner.executeFind : %v", err))
@@ -142,7 +143,7 @@ func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- m
 		return
 	}
 	started := time.Now()
-	res := &model.ExecutionResult{PID: invoke.Process.Pid}
+	res := &returns.ExecutionResult{PID: invoke.Process.Pid}
 
 	stdoutClosed := make(chan struct{})
 	go s.handleFindStdout(res, stdout, stdoutClosed, rowChan, root)

@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
-func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- model.Fileinfo) {
+func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) {
 	defer func() {
 		close(rowChan)
 		if err := recover(); err != nil {
@@ -34,7 +34,7 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 			return filepath.SkipDir
 		}
 
-		entry := model.Fileinfo{
+		entry := returns.Fileinfo{
 			Path: relPath,
 			Mode: info.Mode(),
 			Size: info.Size(),

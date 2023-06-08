@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/system"
 )
 
 func TestScanner_testRegex(t1 *testing.T) {
@@ -85,7 +85,7 @@ func TestScanner_scanDirectory(t1 *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	s := &Scanner{}
-	infoChan := make(chan model.Fileinfo)
+	infoChan := make(chan returns.Fileinfo)
 	go s.scanDirectory(ctx, ".", infoChan)
 	for entry := range infoChan {
 		log.Printf("entry %v", entry)
@@ -99,7 +99,7 @@ func TestScanner_executeFindCommand(t1 *testing.T) {
 	defer cancel()
 	s := &Scanner{}
 	s.FinderBinaryPath = "find"
-	infoChan := make(chan model.Fileinfo)
+	infoChan := make(chan returns.Fileinfo)
 	go s.executeFind(ctx, ".", infoChan)
 	for entry := range infoChan {
 		log.Printf("entry %v", entry)

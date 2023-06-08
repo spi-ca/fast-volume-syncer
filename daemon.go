@@ -1,18 +1,19 @@
 package main
 
 import (
-	"github.com/spf13/viper"
 	"os"
 	"syscall"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"github.com/spf13/viper"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/selector"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 func daemonStopEntry() {
 	pidFilePath := viper.GetString("pid.file")
-	pid, err := util.ReadPidFile(pidFilePath)
+	pid, err := selector.ReadPidFile(pidFilePath)
 	if err != nil {
 		util.ErrLog.Fatal(err)
 	} else if pid < 1 {
@@ -21,13 +22,13 @@ func daemonStopEntry() {
 
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		util.ErrLog.Fatalf("failed to find process(%d) :%w", pid, err)
+		util.ErrLog.Fatalf("failed to find process(%d) :%v", pid, err)
 	}
 	defer proc.Release()
 
 	err = proc.Signal(syscall.SIGTERM)
 	if err != nil {
-		util.ErrLog.Fatalf("failed to SIGTERM(%d) :%w", pid, err)
+		util.ErrLog.Fatalf("failed to SIGTERM(%d) :%v", pid, err)
 	}
 	util.InfoLog.Printf("sending SIGTERM(%d)", pid)
 }
@@ -61,7 +62,7 @@ func daemonStartEntry() {
 	util.InfoLog.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
 	util.InfoLog.Print("	retry.delay=", viper.GetDuration("retry.delay"))
 	util.InfoLog.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
-	util.InfoLog.Print("	retry.max.jiiter=", viper.GetDuration("retry.max.jiiter"))
+	util.InfoLog.Print("	retry.max.jitter=", viper.GetDuration("retry.max.jitter"))
 	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
 	util.InfoLog.Print("---")
 
@@ -72,9 +73,9 @@ func daemonStartEntry() {
 		LogFilePath:     viper.GetString("log.file"),
 		WorkerSize:      viper.GetInt("worker.size"),
 		SandboxDisabled: viper.GetBool("sandbox.disabled") || !sandboxSupported,
-		Common: model.SyncerCommonArguments{
+		Common: args.SyncerCommonArguments{
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
-			Args: model.RsyncArgs{
+			Args: args.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),
 				PreservePermission: viper.GetBool("rsync.perms"),
 				PreserveOwnership:  viper.GetBool("rsync.owner"),
@@ -96,10 +97,12 @@ func daemonStartEntry() {
 			FinderBinaryPath: viper.GetString("scan.find.path"),
 			TaskSize:         viper.GetInt("task.size"),
 			ChunkSize:        viper.GetInt("chunk.size"),
-			RetryAttempts:    viper.GetInt("retry.attempts"),
-			RetryDelay:       viper.GetDuration("retry.delay"),
-			RetryMaxDelay:    viper.GetDuration("retry.max.delay"),
-			RetryMaxJitter:   viper.GetDuration("retry.max.jiiter"),
+			Retry: args.RetryArgs{
+				Attempts:  viper.GetInt("retry.attempts"),
+				Delay:     viper.GetDuration("retry.delay"),
+				MaxDelay:  viper.GetDuration("retry.max.delay"),
+				MaxJitter: viper.GetDuration("retry.max.jitter"),
+			},
 		},
 	}
 	if err := runner.Execute(); err != nil {

@@ -13,14 +13,16 @@ import (
 	"time"
 	"unicode"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/system"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type Invoker struct {
 	SandboxDisabled bool
 
-	Common model.SyncerCommonArguments
+	Common args.SyncerCommonArguments
 }
 
 func (i *Invoker) Run(ctx context.Context, entry copyEntry) error {
@@ -44,7 +46,7 @@ func (i *Invoker) assembleEnvironment(inherited []string) []string {
 	return inherited
 }
 
-func (i *Invoker) handleStdout(res *model.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
+func (i *Invoker) handleStdout(res *returns.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
 	defer close(closeChan)
 	prefix := fmt.Sprintf("[%d]&1> ", res.PID)
 	scanner := bufio.NewScanner(reader)
@@ -54,7 +56,7 @@ func (i *Invoker) handleStdout(res *model.ExecutionResult, reader io.Reader, clo
 	}
 }
 
-func (i *Invoker) handleStderr(res *model.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
+func (i *Invoker) handleStderr(res *returns.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
 	defer close(closeChan)
 	prefix := fmt.Sprintf("[%d]&2> ", res.PID)
 	scanner := bufio.NewScanner(reader)
@@ -77,7 +79,7 @@ func (i *Invoker) execute(ctx context.Context, srcPath, srcSubpath, dstPath, dst
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
 	if !i.SandboxDisabled {
-		if err := util.IsolateMountNamespaceFlags(invoke.SysProcAttr); err != nil {
+		if err := system.IsolateMountNamespaceFlags(invoke.SysProcAttr); err != nil {
 			return fmt.Errorf("failed to sanxbox a process: %w", err)
 		}
 	}
@@ -89,7 +91,7 @@ func (i *Invoker) execute(ctx context.Context, srcPath, srcSubpath, dstPath, dst
 		return fmt.Errorf("failed to start process(rsync): %w", err)
 	}
 	started := time.Now()
-	res := &model.ExecutionResult{PID: invoke.Process.Pid}
+	res := &returns.ExecutionResult{PID: invoke.Process.Pid}
 
 	stdoutClosed := make(chan struct{})
 	go i.handleStdout(res, stdout, stdoutClosed)

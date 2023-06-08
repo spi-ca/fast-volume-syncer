@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
@@ -69,7 +69,7 @@ func syncerEntry() {
 	util.InfoLog.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
 	util.InfoLog.Print("	retry.delay=", viper.GetDuration("retry.delay"))
 	util.InfoLog.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
-	util.InfoLog.Print("	retry.max.jiiter=", viper.GetDuration("retry.max.jiiter"))
+	util.InfoLog.Print("	retry.max.jitter=", viper.GetDuration("retry.max.jitter"))
 	util.InfoLog.Print("	daemonized=", daemonized)
 	util.InfoLog.Print("	selectorInvoked=", selectorInvoked)
 	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
@@ -86,9 +86,9 @@ func syncerEntry() {
 
 	runner := syncer.Runner{
 		Sandboxed: selectorInvoked && sandboxed && sandboxSupported,
-		Common: model.SyncerCommonArguments{
+		Common: args.SyncerCommonArguments{
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
-			Args: model.RsyncArgs{
+			Args: args.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),
 				PreservePermission: viper.GetBool("rsync.perms"),
 				PreserveOwnership:  viper.GetBool("rsync.owner"),
@@ -109,10 +109,12 @@ func syncerEntry() {
 			FinderBinaryPath:        viper.GetString("scan.find.path"),
 			TaskSize:                viper.GetInt("task.size"),
 			ChunkSize:               viper.GetInt("chunk.size"),
-			RetryAttempts:           viper.GetInt("retry.attempts"),
-			RetryDelay:              viper.GetDuration("retry.delay"),
-			RetryMaxDelay:           viper.GetDuration("retry.max.delay"),
-			RetryMaxJitter:          viper.GetDuration("retry.max.jiiter"),
+			Retry: args.RetryArgs{
+				Attempts:  viper.GetInt("retry.attempts"),
+				Delay:     viper.GetDuration("retry.delay"),
+				MaxDelay:  viper.GetDuration("retry.max.delay"),
+				MaxJitter: viper.GetDuration("retry.max.jitter"),
+			},
 		},
 		SourceMountPath:         argSrcStoragePath,
 		SourceMountSubPath:      argSrcStorageSubPath,

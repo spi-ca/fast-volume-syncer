@@ -12,9 +12,11 @@ import (
 	"strings"
 	"unicode"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/find"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/rsync"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/system"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -24,7 +26,7 @@ var (
 
 type Runner struct {
 	Sandboxed bool
-	Common    model.SyncerCommonArguments
+	Common    args.SyncerCommonArguments
 
 	SourceMountPath    string
 	SourceMountSubPath string
@@ -81,7 +83,7 @@ func (r *Runner) locateFindBinary() string {
 }
 func (r *Runner) prepareDirectory() (string, string, string, error) {
 	if r.Sandboxed {
-		if err := util.Sandbox(r.Common.SandboxMountOption); err != nil {
+		if err := system.Sandbox(r.Common.SandboxMountOption); err != nil {
 			return "", "", "", fmt.Errorf("failed to sanxbox a process: %w", err)
 		}
 	}
@@ -108,23 +110,23 @@ func (r *Runner) prepareDirectory() (string, string, string, error) {
 	srcMountSubPath := filepath.Join(srcMountPath, r.SourceMountSubPath)
 	dstMountSubPath := filepath.Join(dstMountPath, r.DestinationMountSubPath)
 
-	srcMountInfo := model.MountInfo{
+	srcMountInfo := returns.MountInfo{
 		Host:    r.Common.SourceMountHost,
 		Path:    r.SourceMountPath,
 		Options: r.Common.SourceMountOptions,
 	}
-	dstMountInfo := model.MountInfo{
+	dstMountInfo := returns.MountInfo{
 		Host:    r.Common.DestinationMountHost,
 		Path:    r.DestinationMountPath,
 		Options: r.Common.DestinationMountOptions,
 	}
 
-	if err = util.Mount(srcMountInfo.Source(), srcMountPath, srcMountInfo.Type(), srcMountInfo.RefinedOptions()); err != nil {
+	if err = system.Mount(srcMountInfo.Source(), srcMountPath, srcMountInfo.Type(), srcMountInfo.RefinedOptions()); err != nil {
 		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", dstMountInfo, srcMountPath, err)
 	}
 	util.InfoLog.Printf("source mount success!(%s %s)", srcMountInfo, srcMountPath)
 
-	if err = util.Mount(dstMountInfo.Source(), dstMountPath, dstMountInfo.Type(), dstMountInfo.RefinedOptions()); err != nil {
+	if err = system.Mount(dstMountInfo.Source(), dstMountPath, dstMountInfo.Type(), dstMountInfo.RefinedOptions()); err != nil {
 		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", dstMountInfo, dstMountPath, err)
 	}
 	util.InfoLog.Printf("destination mount success!(%s %s)", dstMountInfo, dstMountPath)
@@ -164,7 +166,7 @@ func (r *Runner) cleanupDirectory(tempPath string) {
 	}
 
 	for _, path := range umountPaths {
-		if err := util.Umount(path); err != nil {
+		if err := system.Umount(path); err != nil {
 			util.ErrLog.Printf("failed to unmount %s: %s", path, err)
 		}
 	}
@@ -193,10 +195,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 
 	rsyncInvoker := rsync.Task{
 		Arguments:       r.Common.Args.Assemble(srcPath, dstPath),
-		RetryAttempts:   r.Common.RetryAttempts,
-		RetryDelay:      r.Common.RetryDelay,
-		RetryMaxDelay:   r.Common.RetryMaxDelay,
-		RetryMaxJitter:  r.Common.RetryMaxJitter,
+		Retry:           r.Common.Retry,
 		DestinationPath: dstPath,
 	}
 

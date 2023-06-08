@@ -1,4 +1,4 @@
-package model
+package returns
 
 import (
 	"fmt"
@@ -68,7 +68,9 @@ func (r *ExecutionResult) HandleError() error {
 	}
 
 	if exitcode == 0 {
-		util.SendSlackMessage(buf.String())
+		if buf.Len() > 0 {
+			util.ErrLog.Print(buf.String())
+		}
 		return nil
 	} else if err := r.Err; err != nil {
 		return fmt.Errorf("%w%s", err, buf.String())

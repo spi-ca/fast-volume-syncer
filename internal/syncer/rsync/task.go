@@ -20,7 +20,8 @@ import (
 
 	"github.com/avast/retry-go"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -31,45 +32,21 @@ var (
 type Task struct {
 	Arguments       []string
 	DestinationPath string
-	RetryAttempts   int
-	RetryDelay      time.Duration
-	RetryMaxDelay   time.Duration
-	RetryMaxJitter  time.Duration
+	Retry           args.RetryArgs
 }
 
-func (t *Task) Execute(ctx context.Context, fileList []model.Fileinfo) error {
+func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
 
-	if t.RetryAttempts <= 0 {
+	if t.Retry.Attempts <= 0 {
 		return t.execute(ctx, fileList)
 	}
-
-	optionArgs := []retry.Option{
-		retry.Context(ctx),
-		retry.Attempts(uint(t.RetryAttempts)),
-	}
-
-	if t.RetryDelay > 0 {
-		optionArgs = append(optionArgs, retry.Delay(t.RetryDelay))
-		if t.RetryMaxDelay > t.RetryDelay {
-			optionArgs = append(optionArgs,
-				retry.MaxJitter(t.RetryMaxJitter),
-				retry.DelayType(retry.BackOffDelay),
-			)
-		} else {
-			optionArgs = append(optionArgs, retry.DelayType(retry.FixedDelay))
-		}
-	}
-	if t.RetryMaxJitter > 0 {
-		optionArgs = append(optionArgs, retry.MaxJitter(t.RetryMaxJitter))
-	}
-
 	return retry.Do(
 		func() error { return t.execute(ctx, fileList) },
-		optionArgs...,
+		t.Retry.Assemble(ctx)...,
 	)
 }
 
-func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}, fileList []model.Fileinfo) {
+func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}, fileList []returns.Fileinfo) {
 	defer close(closeChan)
 	if writer == nil {
 		return
@@ -104,7 +81,7 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 
 }
 
-func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []model.Fileinfo, closeChan chan struct{}) {
+func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []returns.Fileinfo, closeChan chan struct{}) {
 	defer close(closeChan)
 
 	prefix := fmt.Sprintf("[%d]&1> ", res.pid)
@@ -194,7 +171,7 @@ func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closeChan chan<-
 	}
 }
 
-func (t *Task) execute(ctx context.Context, fileList []model.Fileinfo) error {
+func (t *Task) execute(ctx context.Context, fileList []returns.Fileinfo) error {
 	invoke := exec.CommandContext(
 		ctx,
 		"rsync",

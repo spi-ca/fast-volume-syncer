@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/selector"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
@@ -61,7 +61,7 @@ func selectorEntry() {
 	util.InfoLog.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
 	util.InfoLog.Print("	retry.delay=", viper.GetDuration("retry.delay"))
 	util.InfoLog.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
-	util.InfoLog.Print("	retry.max.jiiter=", viper.GetDuration("retry.max.jiiter"))
+	util.InfoLog.Print("	retry.max.jitter=", viper.GetDuration("retry.max.jitter"))
 	util.InfoLog.Print("	daemonized=", daemonized)
 	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
 	util.InfoLog.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
@@ -69,14 +69,15 @@ func selectorEntry() {
 
 	if daemonized {
 		if pidFilePath := os.Getenv("_PID_FILEPATH"); len(pidFilePath) > 0 {
-			closer, err := util.AcquirePidFile(pidFilePath)
+			closer, err := selector.AcquirePidFile(pidFilePath)
 			if err != nil {
-				util.ErrLog.Println("selector already running : %w", err)
+				util.ErrLog.Println("selector already running : %v", err)
 				return
 			}
 			defer closer()
 		}
-		util.SetSlackWebhookUrl(slackWebhookUrl)
+		util.SlackSender.Start()
+		defer util.SlackSender.Close()
 	}
 
 	runner := selector.Runner{
@@ -87,9 +88,9 @@ func selectorEntry() {
 
 		Template: selector.Invoker{
 			SandboxDisabled: viper.GetBool("sandbox.disabled") || !sandboxSupported,
-			Common: model.SyncerCommonArguments{
+			Common: args.SyncerCommonArguments{
 				SandboxMountOption: viper.GetString("sandbox.mount.option"),
-				Args: model.RsyncArgs{
+				Args: args.RsyncArgs{
 					Verbose:            viper.GetBool("rsync.verbose"),
 					PreservePermission: viper.GetBool("rsync.perms"),
 					PreserveOwnership:  viper.GetBool("rsync.owner"),
@@ -111,10 +112,12 @@ func selectorEntry() {
 				FinderBinaryPath: viper.GetString("scan.find.path"),
 				TaskSize:         viper.GetInt("task.size"),
 				ChunkSize:        viper.GetInt("chunk.size"),
-				RetryAttempts:    viper.GetInt("retry.attempts"),
-				RetryDelay:       viper.GetDuration("retry.delay"),
-				RetryMaxDelay:    viper.GetDuration("retry.max.delay"),
-				RetryMaxJitter:   viper.GetDuration("retry.max.jiiter"),
+				Retry: args.RetryArgs{
+					Attempts:  viper.GetInt("retry.attempts"),
+					Delay:     viper.GetDuration("retry.delay"),
+					MaxDelay:  viper.GetDuration("retry.max.delay"),
+					MaxJitter: viper.GetDuration("retry.max.jitter"),
+				},
 			},
 		},
 	}

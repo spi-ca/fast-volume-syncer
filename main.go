@@ -19,7 +19,6 @@ const (
 	name                = "fast-volume-syncer"
 	defaultNodeSelector = -1
 	defaultCSVFilename  = "data/09_copy_entries.csv"
-	slackWebhookUrl     = "https://example.invalid/webhook"
 )
 
 var (

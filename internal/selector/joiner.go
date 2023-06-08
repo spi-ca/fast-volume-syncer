@@ -2,8 +2,9 @@ package selector
 
 import (
 	"context"
-	"go.uber.org/multierr"
 	"sync"
+
+	"go.uber.org/multierr"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )

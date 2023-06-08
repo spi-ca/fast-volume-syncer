@@ -7,7 +7,7 @@ import (
 
 	"go.uber.org/multierr"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/rsync"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
@@ -37,13 +37,13 @@ func newChunkJoiner(
 		invoker: invoker,
 		chunkPool: sync.Pool{
 			New: func() interface{} {
-				return make([]model.Fileinfo, 0, chunkSize)
+				return make([]returns.Fileinfo, 0, chunkSize)
 			},
 		},
 		scanDuration: scanDuration,
 	}
 }
-func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan model.Fileinfo) error {
+func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.Fileinfo) error {
 	go c.dispatchChunks(ctx, entryRecvChan)
 
 	var err error
@@ -53,7 +53,7 @@ func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan model.Fi
 	return err
 }
 
-func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-chan model.Fileinfo) {
+func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-chan returns.Fileinfo) {
 	ended := false
 	deadline := time.NewTicker(c.scanDuration)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -67,7 +67,7 @@ func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-
 		deadline.Stop()
 	}()
 
-	var chunk []model.Fileinfo
+	var chunk []returns.Fileinfo
 	for !ended {
 		select {
 		case <-parentCtx.Done():
@@ -83,7 +83,7 @@ func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-
 				break
 			}
 			if chunk == nil {
-				chunk = c.chunkPool.Get().([]model.Fileinfo)[0:0]
+				chunk = c.chunkPool.Get().([]returns.Fileinfo)[0:0]
 			}
 			chunk = append(chunk, entry)
 			if len(chunk) < cap(chunk) {
@@ -109,7 +109,7 @@ func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-
 	}
 }
 
-func (c *chunkJoiner) submit(ctx context.Context, chunk []model.Fileinfo) {
+func (c *chunkJoiner) submit(ctx context.Context, chunk []returns.Fileinfo) {
 	defer func() {
 		<-c.sem
 		c.wg.Done()

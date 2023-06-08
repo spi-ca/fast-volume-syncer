@@ -1,4 +1,4 @@
-package util
+package selector
 
 import (
 	"bufio"
@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 func AcquirePidFile(filename string) (func(), error) {
@@ -64,5 +66,5 @@ func ReadPidFile(filename string) (int, error) {
 		return -1, fmt.Errorf("first line is too long, pidfile(%s)", filename)
 	}
 
-	return int(SimpleStrconv(line)), nil
+	return int(util.SimpleStrconv(line)), nil
 }

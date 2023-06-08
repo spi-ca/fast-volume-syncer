@@ -1,4 +1,4 @@
-package model
+package args
 
 import (
 	"strconv"
@@ -24,11 +24,7 @@ type SyncerCommonArguments struct {
 
 	TaskSize  int
 	ChunkSize int
-
-	RetryAttempts  int
-	RetryDelay     time.Duration
-	RetryMaxDelay  time.Duration
-	RetryMaxJitter time.Duration
+	Retry     RetryArgs
 }
 
 func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string {
@@ -59,10 +55,10 @@ func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string
 	envs = append(envs, "TASK_SIZE", strconv.Itoa(i.TaskSize))
 	envs = append(envs, "CHUNK_SIZE", strconv.Itoa(i.ChunkSize))
 
-	envs = append(envs, "RETRY_ATTEMPTS", strconv.Itoa(i.RetryAttempts))
-	envs = append(envs, "RETRY_DELAY", i.RetryDelay.String())
-	envs = append(envs, "RETRY_MAX_DELAY", i.RetryMaxDelay.String())
-	envs = append(envs, "RETRY_MAX_JITTER", i.RetryMaxJitter.String())
+	envs = append(envs, "RETRY_ATTEMPTS", strconv.Itoa(i.Retry.Attempts))
+	envs = append(envs, "RETRY_DELAY", i.Retry.Delay.String())
+	envs = append(envs, "RETRY_MAX_DELAY", i.Retry.MaxDelay.String())
+	envs = append(envs, "RETRY_MAX_JITTER", i.Retry.MaxJitter.String())
 
 	b := strings.Builder{}
 	for i := 0; i < len(envs)/2; i++ {
