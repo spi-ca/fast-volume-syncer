@@ -15,7 +15,7 @@ import (
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/system"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -26,7 +26,18 @@ type Invoker struct {
 }
 
 func (i *Invoker) Run(ctx context.Context, entry copyEntry) error {
-	return i.execute(ctx, entry.SourceVolume, entry.SourcePath, entry.DestinationVolume, entry.DestinationPath)
+
+	started := time.Now()
+	err := i.execute(ctx, entry.SourceVolume, entry.SourcePath, entry.DestinationVolume, entry.DestinationPath)
+	elapsed := time.Now().Sub(started)
+
+	if err := res.HandleError(); err != nil {
+		return fmt.Errorf("selector(%d): %w", res.PID, err)
+	} else {
+		util.InfoLog.Printf("selector(%d) ended in %2.2f ms", res.PID, float32(ended.Sub(started).Microseconds())/1000)
+		return nil
+	}
+
 }
 
 func (i *Invoker) assembleEnvironment(inherited []string) []string {
@@ -68,18 +79,12 @@ func (i *Invoker) handleStderr(res *returns.ExecutionResult, reader io.Reader, c
 }
 
 func (i *Invoker) execute(ctx context.Context, srcPath, srcSubpath, dstPath, dstSubpath string) error {
-	self, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to get self-path: %w", err)
-	}
-
-	invoke := exec.CommandContext(ctx, self, "sync", srcPath, srcSubpath, dstPath, dstSubpath)
-
+	invoke := exec.CommandContext(ctx, sys.Executable(), "sync", srcPath, srcSubpath, dstPath, dstSubpath)
 	invoke.Env = i.assembleEnvironment(os.Environ())
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
 	if !i.SandboxDisabled {
-		if err := system.IsolateMountNamespaceFlags(invoke.SysProcAttr); err != nil {
+		if err := sys.IsolateMountNamespaceFlags(invoke.SysProcAttr); err != nil {
 			return fmt.Errorf("failed to sanxbox a process: %w", err)
 		}
 	}
@@ -90,7 +95,7 @@ func (i *Invoker) execute(ctx context.Context, srcPath, srcSubpath, dstPath, dst
 	if err := invoke.Start(); err != nil {
 		return fmt.Errorf("failed to start process(rsync): %w", err)
 	}
-	started := time.Now()
+
 	res := &returns.ExecutionResult{PID: invoke.Process.Pid}
 
 	stdoutClosed := make(chan struct{})
@@ -107,11 +112,6 @@ func (i *Invoker) execute(ctx context.Context, srcPath, srcSubpath, dstPath, dst
 	}
 
 	res.Err = invoke.Wait()
-	ended := time.Now()
-	if err := res.HandleError(); err != nil {
-		return fmt.Errorf("selector(%d): %w", res.PID, err)
-	} else {
-		util.InfoLog.Printf("selector(%d) ended in %2.2f ms", res.PID, float32(ended.Sub(started).Microseconds())/1000)
-		return nil
-	}
+
+	return res.HandleError()
 }

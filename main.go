@@ -12,6 +12,7 @@ import (
 
 	flags "github.com/spf13/pflag"
 
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/entry"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -22,16 +23,6 @@ const (
 )
 
 var (
-	argAction string
-
-	argCopyInfoFilePath string
-	argNodeSelector     int
-
-	argSrcStoragePath    string
-	argSrcStorageSubPath string
-	argDstStoragePath    string
-	argDstStorageSubPath string
-
 	sandboxSupported = strings.Compare(runtime.GOOS, "linux") == 0
 	flagNameReplacer = strings.NewReplacer("-", ".", "_", ".")
 	envNameReplacer  = strings.NewReplacer(".", "_", "-", "_")
@@ -71,78 +62,85 @@ func init() {
 	viper.SetEnvKeyReplacer(envNameReplacer)
 	viper.AutomaticEnv()
 	_ = viper.BindFlagValues(util.PFlagViperReplacer{FlagSet: flags.CommandLine, Replacer: flagNameReplacer})
+}
 
-	flags.CommandLine.SetNormalizeFunc(nil)
+func main() {
+
 	consumedArgs := 0
 	if flags.NArg() == 0 {
 		usage()
 	}
 
-	argAction = flags.Arg(0)
+	action := flags.Arg(0)
 	consumedArgs++
 
-	switch argAction {
+	switch action {
 	case "sync":
+		var (
+			srcStoragePath,
+			srcStorageSubPath,
+			dstStoragePath,
+			dstStorageSubPath string
+		)
 		switch flags.NArg() {
 		case consumedArgs + 2:
-			argSrcStoragePath = flags.Arg(consumedArgs + 0)
-			argDstStoragePath = flags.Arg(consumedArgs + 1)
+			srcStoragePath = flags.Arg(consumedArgs + 0)
+			dstStoragePath = flags.Arg(consumedArgs + 1)
 			consumedArgs += 2
 		case consumedArgs + 4:
-			argSrcStoragePath = flags.Arg(consumedArgs + 0)
-			argSrcStorageSubPath = flags.Arg(consumedArgs + 1)
-			argDstStoragePath = flags.Arg(consumedArgs + 2)
-			argDstStorageSubPath = flags.Arg(consumedArgs + 3)
+			srcStoragePath = flags.Arg(consumedArgs + 0)
+			srcStorageSubPath = flags.Arg(consumedArgs + 1)
+			dstStoragePath = flags.Arg(consumedArgs + 2)
+			dstStorageSubPath = flags.Arg(consumedArgs + 3)
 			consumedArgs += 4
 		default:
 			fmt.Println("required arguments missing")
 			usage()
 		}
-	case "select", "start":
+		entry.Syncer(sandboxSupported, srcStoragePath, srcStorageSubPath, dstStoragePath, dstStorageSubPath)
+	case "select":
+		var (
+			nodeSelector     = defaultNodeSelector
+			copyInfoFilePath = defaultCSVFilename
+		)
 		switch flags.NArg() {
 		case consumedArgs:
-			argNodeSelector = defaultNodeSelector
-			argCopyInfoFilePath = defaultCSVFilename
 			consumedArgs += 0
 		case consumedArgs + 1:
-			rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0))
-			if err != nil {
+			if rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0)); err == nil {
+				nodeSelector = rawNodeSelector
+			} else {
 				fmt.Println("failed to parse nodeSelector:%w", err)
 				usage()
 			}
-			argNodeSelector = rawNodeSelector
-			argCopyInfoFilePath = defaultCSVFilename
 			consumedArgs += 1
 		case consumedArgs + 2:
-			rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0))
-			if err != nil {
+			if rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0)); err == nil {
+				nodeSelector = rawNodeSelector
+			} else {
 				fmt.Println("failed to parse nodeSelector:%w", err)
 				usage()
 			}
-			argNodeSelector = rawNodeSelector
-			argCopyInfoFilePath = flags.Arg(consumedArgs + 1)
+			copyInfoFilePath = flags.Arg(consumedArgs + 1)
 			consumedArgs += 2
 		default:
 			fmt.Println("required arguments missing")
 			usage()
 		}
+		entry.Selector(sandboxSupported, nodeSelector, copyInfoFilePath)
+	case "start":
+		entry.DaemonStart()
 	case "stop":
 	default:
-		fmt.Printf("invalid action %s\n", argAction)
+		fmt.Printf("invalid action %s\n", action)
 		usage()
 	}
-}
-
-func main() {
 	switch argAction {
 	case "sync":
-		syncerEntry()
 	case "select":
-		selectorEntry()
 	case "start":
-		daemonStartEntry()
 	case "stop":
-		daemonStopEntry()
+		entry.DaemonStop()
 	default:
 		usage()
 	}

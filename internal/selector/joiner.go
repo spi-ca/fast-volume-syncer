@@ -2,9 +2,8 @@ package selector
 
 import (
 	"context"
+	"errors"
 	"sync"
-
-	"go.uber.org/multierr"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
@@ -26,11 +25,12 @@ func newWorkerJoiner(workerSize int, invoker *Invoker) *workerJoiner {
 func (c *workerJoiner) Execute(ctx context.Context, entryRecvChan <-chan copyEntry) error {
 	errorChan := make(chan error, len(c.sem))
 	go c.dispatch(ctx, entryRecvChan, errorChan)
-	var err error
-	for newErr := range errorChan {
-		err = multierr.Append(err, newErr)
+
+	var errs []error
+	for err := range errorChan {
+		errs = append(errs, err)
 	}
-	return err
+	return errors.Join(errs...)
 }
 
 func (c *workerJoiner) dispatch(parentCtx context.Context, entryRecvChan <-chan copyEntry, errorChan chan<- error) {

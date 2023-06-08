@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -76,12 +77,7 @@ func (i *Daemonizer) Execute() error {
 		_ = logFile.Close()
 	}()
 
-	self, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to get self-path: %w", err)
-	}
-
-	invoke := exec.Command("nohup", self, "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath)
+	invoke := exec.Command("nohup", sys.Executable(), "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath)
 	invoke.Stdin = nil
 	invoke.Stdout = logFile
 	invoke.Stderr = logFile
