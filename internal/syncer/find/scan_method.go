@@ -2,6 +2,7 @@ package find
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -13,7 +14,7 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 	defer func() {
 		close(rowChan)
 		if err := recover(); err != nil {
-			util.ErrLog.Printf("panic on Scanner.scanDirectory: %v", err)
+			util.SendSlackMessage(fmt.Sprintf("panic on Scanner.scanDirectory: %v", err))
 		}
 	}()
 	iter := func(path string, d os.DirEntry, err error) error {
@@ -49,5 +50,6 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 	err := filepath.WalkDir(root, iter)
 	if err != nil {
 		util.ErrLog.Printf("walkdir(%s) has returned err: %v", root, err)
+		util.SendSlackMessage(fmt.Sprintf("panic on Scanner.executeFind : %v", err))
 	}
 }

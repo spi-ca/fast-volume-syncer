@@ -121,7 +121,7 @@ func (s *Scanner) handleFindStdout(res *model.ExecutionResult, reader io.Reader,
 func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- model.Fileinfo) {
 	defer func() {
 		if err := recover(); err != nil {
-			util.ErrLog.Printf("panic on Scanner.executeFind : %v", err)
+			util.SendSlackMessage(fmt.Sprintf("panic on Scanner.executeFind : %v", err))
 		}
 	}()
 

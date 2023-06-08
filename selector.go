@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
@@ -68,8 +68,7 @@ func selectorEntry() {
 	util.InfoLog.Print("---")
 
 	if daemonized {
-		pidFilePath := os.Getenv("_PID_FILEPATH")
-		if len(pidFilePath) > 0 {
+		if pidFilePath := os.Getenv("_PID_FILEPATH"); len(pidFilePath) > 0 {
 			closer, err := util.AcquirePidFile(pidFilePath)
 			if err != nil {
 				util.ErrLog.Println("selector already running : %w", err)
@@ -77,6 +76,7 @@ func selectorEntry() {
 			}
 			defer closer()
 		}
+		util.SetSlackWebhookUrl(slackWebhookUrl)
 	}
 
 	runner := selector.Runner{
@@ -120,8 +120,8 @@ func selectorEntry() {
 	}
 	started := time.Now()
 	if err := runner.Execute(ctx); err != nil {
-		log.Fatal(err)
+		util.SendSlackMessage(err.Error())
 	}
 	ended := time.Now()
-	log.Printf("completed: in %s", ended.Sub(started))
+	util.SendSlackMessage(fmt.Sprintf("completed: in %s", ended.Sub(started)))
 }

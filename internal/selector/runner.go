@@ -121,6 +121,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 
 	entryChan := r.loadCopyEntryCSV(ctx, f)
 	joiner := newWorkerJoiner(r.WorkerSize, &r.Template)
+
 	err := joiner.Execute(ctx, entryChan)
 	if err == nil && ctx.Err() == nil {
 		util.InfoLog.Print("복사 목록 로드 완료")

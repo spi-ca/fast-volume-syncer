@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type ExecutionResult struct {
@@ -32,10 +34,6 @@ func (r *ExecutionResult) LastLogLine() []string {
 }
 
 func (r *ExecutionResult) HandleError() error {
-	return r.exitResult()
-}
-
-func (r *ExecutionResult) exitResult() error {
 	exitcode := 0
 	if err := r.Err; err != nil {
 		// try to get the exit code
@@ -46,17 +44,12 @@ func (r *ExecutionResult) exitResult() error {
 			exitcode = -1
 		}
 	}
-	if exitcode == 0 {
-		return nil
-	}
 
 	buf := &strings.Builder{}
 	lastLoglines := r.LastLogLine()
 
-	if len(lastLoglines) > 0 {
-		buf.WriteString(", ")
-	}
 	if num := len(lastLoglines); num > 0 {
+		buf.WriteString(", ")
 		_, _ = fmt.Fprintf(buf, "\n=> last %d log", num)
 		if num > 1 {
 			buf.WriteByte('s')
@@ -74,7 +67,10 @@ func (r *ExecutionResult) exitResult() error {
 		buf.WriteByte(']')
 	}
 
-	if err := r.Err; err != nil {
+	if exitcode == 0 {
+		util.SendSlackMessage(buf.String())
+		return nil
+	} else if err := r.Err; err != nil {
 		return fmt.Errorf("%w%s", err, buf.String())
 	} else {
 		return fmt.Errorf("%s", buf.String())

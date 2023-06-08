@@ -2,9 +2,8 @@ package selector
 
 import (
 	"context"
-	"sync"
-
 	"go.uber.org/multierr"
+	"sync"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
@@ -13,37 +12,34 @@ type workerJoiner struct {
 	wg  sync.WaitGroup
 	sem chan bool
 
-	errorChan chan error
-
 	invoker *Invoker
 }
 
 func newWorkerJoiner(workerSize int, invoker *Invoker) *workerJoiner {
 	return &workerJoiner{
-		sem:       make(chan bool, workerSize),
-		errorChan: make(chan error, workerSize),
-		invoker:   invoker,
+		sem:     make(chan bool, workerSize),
+		invoker: invoker,
 	}
 }
 
 func (c *workerJoiner) Execute(ctx context.Context, entryRecvChan <-chan copyEntry) error {
-	go c.dispatch(ctx, entryRecvChan)
-
+	errorChan := make(chan error, len(c.sem))
+	go c.dispatch(ctx, entryRecvChan, errorChan)
 	var err error
-	for newErr := range c.errorChan {
+	for newErr := range errorChan {
 		err = multierr.Append(err, newErr)
 	}
 	return err
 }
 
-func (c *workerJoiner) dispatch(parentCtx context.Context, entryRecvChan <-chan copyEntry) {
+func (c *workerJoiner) dispatch(parentCtx context.Context, entryRecvChan <-chan copyEntry, errorChan chan<- error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		if err := recover(); err != nil {
 			util.ErrLog.Printf("panic on workerJoiner: %v", err)
 		}
 		c.wg.Wait()
-		close(c.errorChan)
+		close(errorChan)
 		cancel()
 	}()
 
@@ -58,17 +54,17 @@ func (c *workerJoiner) dispatch(parentCtx context.Context, entryRecvChan <-chan 
 			}
 			c.wg.Add(1)
 			c.sem <- true
-			go c.submit(ctx, entry)
+			go c.submit(ctx, entry, errorChan)
 		}
 	}
 }
 
-func (c *workerJoiner) submit(ctx context.Context, entry copyEntry) {
+func (c *workerJoiner) submit(ctx context.Context, entry copyEntry, errorChan chan<- error) {
 	defer func() {
 		<-c.sem
 		c.wg.Done()
 	}()
 	if err := c.invoker.Run(ctx, entry); err != nil {
-		c.errorChan <- err
+		errorChan <- err
 	}
 }
