@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/spf13/viper"
+	"os"
+	"syscall"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/selector"
@@ -9,8 +11,25 @@ import (
 )
 
 func daemonStopEntry() {
-	// todo stop function
-	// todo pid file
+	pidFilePath := viper.GetString("pid.file")
+	pid, err := util.ReadPidFile(pidFilePath)
+	if err != nil {
+		util.ErrLog.Fatal(err)
+	} else if pid < 1 {
+		util.ErrLog.Fatalf("invalid pid(%d)")
+	}
+
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		util.ErrLog.Fatalf("failed to find process(%d) :%w", pid, err)
+	}
+	defer proc.Release()
+
+	err = proc.Signal(syscall.SIGTERM)
+	if err != nil {
+		util.ErrLog.Fatalf("failed to SIGTERM(%d) :%w", pid, err)
+	}
+	util.InfoLog.Printf("sending SIGTERM(%d)", pid)
 }
 
 func daemonStartEntry() {
@@ -49,6 +68,7 @@ func daemonStartEntry() {
 	runner := selector.Daemonizer{
 		NodeSelector:    argNodeSelector,
 		CopyInfoCSVPath: argCopyInfoFilePath,
+		PidFilePath:     viper.GetString("pid.file"),
 		LogFilePath:     viper.GetString("log.file"),
 		WorkerSize:      viper.GetInt("worker.size"),
 		SandboxDisabled: viper.GetBool("sandbox.disabled") || !sandboxSupported,

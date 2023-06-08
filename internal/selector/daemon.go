@@ -18,6 +18,7 @@ type Daemonizer struct {
 	NodeSelector    int
 	CopyInfoCSVPath string
 	LogFilePath     string
+	PidFilePath     string
 	WorkerSize      int
 	SandboxDisabled bool
 
@@ -28,6 +29,7 @@ func (i *Daemonizer) assembleEnvironment(inherited []string) []string {
 	inherited = i.Common.AssembleEnvironment(inherited)
 	envs := make([]string, 0, 1)
 	envs = append(envs, "_FVS_DAEMONEZED", strconv.FormatBool(true))
+	envs = append(envs, "_PID_FILEPATH", i.PidFilePath)
 	envs = append(envs, "WORKER_SIZE", strconv.Itoa(i.WorkerSize))
 	envs = append(envs, "SANDBOX_DISABLED", strconv.FormatBool(i.SandboxDisabled))
 	b := strings.Builder{}

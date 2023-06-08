@@ -126,6 +126,7 @@ func init() {
 			fmt.Println("required arguments missing")
 			usage()
 		}
+	case "stop":
 	default:
 		fmt.Printf("invalid action %s\n", argAction)
 		usage()

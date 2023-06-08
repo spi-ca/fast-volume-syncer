@@ -67,6 +67,18 @@ func selectorEntry() {
 	util.InfoLog.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
 	util.InfoLog.Print("---")
 
+	if daemonized {
+		pidFilePath := os.Getenv("_PID_FILEPATH")
+		if len(pidFilePath) > 0 {
+			closer, err := util.AcquirePidFile(pidFilePath)
+			if err != nil {
+				util.ErrLog.Println("selector already running : %w", err)
+				return
+			}
+			defer closer()
+		}
+	}
+
 	runner := selector.Runner{
 		NodeSelector:    argNodeSelector,
 		CopyInfoCSVPath: argCopyInfoFilePath,
