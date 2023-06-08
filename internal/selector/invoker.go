@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -14,13 +13,14 @@ import (
 	"time"
 	"unicode"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type Invoker struct {
 	SandboxDisabled bool
 
-	Common common.Template
+	Common model.SyncerCommonArguments
 }
 
 func (i *Invoker) Run(ctx context.Context, entry copyEntry) error {
@@ -44,14 +44,40 @@ func (i *Invoker) assembleEnvironment(inherited []string) []string {
 	return inherited
 }
 
+func (i *Invoker) handleStdout(res *model.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
+	defer close(closeChan)
+	prefix := fmt.Sprintf("[%d]&1> ", res.PID)
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
+		util.InfoLog.Print(prefix, line)
+	}
+}
+
+func (i *Invoker) handleStderr(res *model.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
+	defer close(closeChan)
+	prefix := fmt.Sprintf("[%d]&2> ", res.PID)
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
+		res.AppendLogLine(line)
+		util.ErrLog.Print(prefix, line)
+	}
+}
+
 func (i *Invoker) execute(ctx context.Context, srcPath, srcSubpath, dstPath, dstSubpath string) error {
-	invoke := exec.CommandContext(ctx, common.Executables(), "sync", srcPath, srcSubpath, dstPath, dstSubpath)
+	self, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get self-path: %w", err)
+	}
+
+	invoke := exec.CommandContext(ctx, self, "sync", srcPath, srcSubpath, dstPath, dstSubpath)
 
 	invoke.Env = i.assembleEnvironment(os.Environ())
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
 	if !i.SandboxDisabled {
-		if err := common.ApplySandboxFlags(invoke.SysProcAttr); err != nil {
+		if err := util.IsolateMountNamespaceFlags(invoke.SysProcAttr); err != nil {
 			return fmt.Errorf("failed to sanxbox a process: %w", err)
 		}
 	}
@@ -63,13 +89,13 @@ func (i *Invoker) execute(ctx context.Context, srcPath, srcSubpath, dstPath, dst
 		return fmt.Errorf("failed to start process(rsync): %w", err)
 	}
 	started := time.Now()
-	pid := invoke.Process.Pid
+	res := &model.ExecutionResult{PID: invoke.Process.Pid}
 
 	stdoutClosed := make(chan struct{})
-	go i.handleStdout(pid, stdout, stdoutClosed)
+	go i.handleStdout(res, stdout, stdoutClosed)
 
 	stderrClosed := make(chan struct{})
-	go i.handleStderr(pid, stderr, stderrClosed)
+	go i.handleStderr(res, stderr, stderrClosed)
 
 	select {
 	case <-stdoutClosed:
@@ -78,32 +104,12 @@ func (i *Invoker) execute(ctx context.Context, srcPath, srcSubpath, dstPath, dst
 		<-stdoutClosed
 	}
 
-	err := invoke.Wait()
+	res.Err = invoke.Wait()
 	ended := time.Now()
-	if err != nil {
-		return fmt.Errorf("selector(%d): %w", pid, err)
+	if err := res.HandleError(); err != nil {
+		return fmt.Errorf("selector(%d): %w", res.PID, err)
 	} else {
-		log.Printf("selector(%d) ended in %2.2f ms", pid, float32(ended.Sub(started).Microseconds())/1000)
+		util.InfoLog.Printf("selector(%d) ended in %2.2f ms", res.PID, float32(ended.Sub(started).Microseconds())/1000)
 		return nil
-	}
-}
-
-func (i *Invoker) handleStdout(pid int, reader io.Reader, closeChan chan<- struct{}) {
-	defer close(closeChan)
-	prefix := fmt.Sprintf("[%d]&2> ", pid)
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
-		log.Print(prefix, line)
-	}
-}
-
-func (i *Invoker) handleStderr(pid int, reader io.Reader, closeChan chan<- struct{}) {
-	defer close(closeChan)
-	prefix := fmt.Sprintf("[%d]&2> ", pid)
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
-		log.Print(prefix, line)
 	}
 }

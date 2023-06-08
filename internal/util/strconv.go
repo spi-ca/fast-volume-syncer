@@ -1,4 +1,4 @@
-package common
+package util
 
 func SimpleStrconv(in []byte) (number int64) {
 	if len(in) == 0 {

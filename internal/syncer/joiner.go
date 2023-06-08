@@ -2,14 +2,14 @@ package syncer
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
 	"go.uber.org/multierr"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/rsync"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type chunkJoiner struct {
@@ -37,13 +37,13 @@ func newChunkJoiner(
 		invoker: invoker,
 		chunkPool: sync.Pool{
 			New: func() interface{} {
-				return make([]common.Fileinfo, 0, chunkSize)
+				return make([]model.Fileinfo, 0, chunkSize)
 			},
 		},
 		scanDuration: scanDuration,
 	}
 }
-func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan common.Fileinfo) error {
+func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan model.Fileinfo) error {
 	go c.dispatchChunks(ctx, entryRecvChan)
 
 	var err error
@@ -53,13 +53,13 @@ func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan common.F
 	return err
 }
 
-func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-chan common.Fileinfo) {
+func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-chan model.Fileinfo) {
 	ended := false
 	deadline := time.NewTicker(c.scanDuration)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("panic on chunkJoiner: %v", err)
+			util.ErrLog.Printf("panic on chunkJoiner: %v", err)
 		}
 		c.wg.Wait()
 		close(c.errorChan)
@@ -67,7 +67,7 @@ func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-
 		deadline.Stop()
 	}()
 
-	var chunk []common.Fileinfo
+	var chunk []model.Fileinfo
 	for !ended {
 		select {
 		case <-parentCtx.Done():
@@ -83,7 +83,7 @@ func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-
 				break
 			}
 			if chunk == nil {
-				chunk = c.chunkPool.Get().([]common.Fileinfo)[0:0]
+				chunk = c.chunkPool.Get().([]model.Fileinfo)[0:0]
 			}
 			chunk = append(chunk, entry)
 			if len(chunk) < cap(chunk) {
@@ -109,7 +109,7 @@ func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-
 	}
 }
 
-func (c *chunkJoiner) submit(ctx context.Context, chunk []common.Fileinfo) {
+func (c *chunkJoiner) submit(ctx context.Context, chunk []model.Fileinfo) {
 	defer func() {
 		<-c.sem
 		c.wg.Done()

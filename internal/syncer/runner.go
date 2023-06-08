@@ -6,16 +6,16 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"unicode"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/find"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/rsync"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 
 type Runner struct {
 	Sandboxed bool
-	Common    common.Template
+	Common    model.SyncerCommonArguments
 
 	SourceMountPath    string
 	SourceMountSubPath string
@@ -37,7 +37,7 @@ func (r *Runner) logLineByLine(reader io.Reader, prefix string) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
-		log.Print(prefix, line)
+		util.InfoLog.Print(prefix, line)
 	}
 }
 
@@ -45,23 +45,23 @@ func (r *Runner) logVolumeInfo(path string) {
 	ctx, cencel := context.WithCancel(context.Background())
 	defer cencel()
 	if out, err := exec.CommandContext(ctx, "ls", "-al", path).CombinedOutput(); err != nil {
-		log.Printf("failed to start executable(ls): %v", err)
+		util.ErrLog.Printf("failed to start executable(ls): %v", err)
 	} else {
-		log.Printf("directory_info(%s)=>", path)
+		util.InfoLog.Printf("directory_info(%s)=>", path)
 		r.logLineByLine(bytes.NewReader(out), "\t")
 	}
 
 	if out, err := exec.CommandContext(ctx, "findmnt", "-T", path).CombinedOutput(); err != nil {
-		log.Printf("failed to start executable(findmnt): %v", err)
+		util.ErrLog.Printf("failed to start executable(findmnt): %v", err)
 	} else {
-		log.Printf("mount_info(%s)=>", path)
+		util.InfoLog.Printf("mount_info(%s)=>", path)
 		r.logLineByLine(bytes.NewReader(out), "\t")
 	}
 
 	if out, err := exec.CommandContext(ctx, "df", "-h", path).CombinedOutput(); err != nil {
-		log.Printf("failed to start executable(df): %v", err)
+		util.ErrLog.Printf("failed to start executable(df): %v", err)
 	} else {
-		log.Printf("fs            =>\t")
+		util.InfoLog.Printf("fs            =>\t")
 		r.logLineByLine(bytes.NewReader(out), "\t")
 	}
 }
@@ -72,7 +72,7 @@ func (r *Runner) locateFindBinary() string {
 	}
 
 	if foundPath, err := exec.LookPath(r.Common.FinderBinaryPath); err != nil {
-		log.Printf("find path(%s) not found", r.Common.FinderBinaryPath)
+		util.ErrLog.Printf("find path(%s) not found", r.Common.FinderBinaryPath)
 		return ""
 	} else {
 		absPath, _ := filepath.Abs(foundPath)
@@ -81,7 +81,7 @@ func (r *Runner) locateFindBinary() string {
 }
 func (r *Runner) prepareDirectory() (string, string, string, error) {
 	if r.Sandboxed {
-		if err := common.Sandbox(r.Common.SandboxMountOption); err != nil {
+		if err := util.Sandbox(r.Common.SandboxMountOption); err != nil {
 			return "", "", "", fmt.Errorf("failed to sanxbox a process: %w", err)
 		}
 	}
@@ -92,7 +92,7 @@ func (r *Runner) prepareDirectory() (string, string, string, error) {
 		return "", "", "", fmt.Errorf("failed to make temp directory: %w", err)
 	}
 
-	log.Printf("created temporary directory: '%s'", tempDir)
+	util.InfoLog.Printf("created temporary directory: '%s'", tempDir)
 
 	if err = os.Chdir(tempDir); err != nil {
 		return tempDir, "", "", fmt.Errorf("failed to change directory(%s): %w", tempDir, err)
@@ -101,36 +101,33 @@ func (r *Runner) prepareDirectory() (string, string, string, error) {
 	// 이제 tempDir가 cwd이다.
 
 	// host:path -> {tempdir}/mountName
+	// 볼륨 마운트 위치
 	srcMountPath := filepath.Join(tempDir, r.Common.SourceMountName)
 	dstMountPath := filepath.Join(tempDir, r.Common.DestinationMountName)
-	srcMountInfo := common.RemoteInfo{
-		MountInfo: common.MountInfo{
-			Host:    r.Common.SourceMountHost,
-			Path:    r.SourceMountPath,
-			Options: r.Common.SourceMountOptions,
-		},
-		SubPath: r.SourceMountSubPath,
+	// 실제 복사 대상
+	srcMountSubPath := filepath.Join(srcMountPath, r.SourceMountSubPath)
+	dstMountSubPath := filepath.Join(dstMountPath, r.DestinationMountSubPath)
+
+	srcMountInfo := model.MountInfo{
+		Host:    r.Common.SourceMountHost,
+		Path:    r.SourceMountPath,
+		Options: r.Common.SourceMountOptions,
 	}
-	dstMountInfo := common.RemoteInfo{
-		MountInfo: common.MountInfo{
-			Host:    r.Common.DestinationMountHost,
-			Path:    r.DestinationMountPath,
-			Options: r.Common.DestinationMountOptions,
-		},
-		SubPath: r.DestinationMountSubPath,
+	dstMountInfo := model.MountInfo{
+		Host:    r.Common.DestinationMountHost,
+		Path:    r.DestinationMountPath,
+		Options: r.Common.DestinationMountOptions,
 	}
-	if err = common.Mount(srcMountInfo.Source(), srcMountPath, srcMountInfo.Type(), srcMountInfo.RefinedOptions()); err != nil {
+
+	if err = util.Mount(srcMountInfo.Source(), srcMountPath, srcMountInfo.Type(), srcMountInfo.RefinedOptions()); err != nil {
 		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", dstMountInfo, srcMountPath, err)
 	}
-	log.Printf("source mount success!(%s %s)", srcMountInfo, srcMountPath)
+	util.InfoLog.Printf("source mount success!(%s %s)", srcMountInfo, srcMountPath)
 
-	if err = common.Mount(dstMountInfo.Source(), dstMountPath, dstMountInfo.Type(), dstMountInfo.RefinedOptions()); err != nil {
+	if err = util.Mount(dstMountInfo.Source(), dstMountPath, dstMountInfo.Type(), dstMountInfo.RefinedOptions()); err != nil {
 		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", dstMountInfo, dstMountPath, err)
 	}
-	log.Printf("destination mount success!(%s %s)", srcMountInfo, dstMountPath)
-
-	srcMountSubPath := filepath.Join(srcMountPath, srcMountInfo.SubPath)
-	dstMountSubPath := filepath.Join(dstMountPath, dstMountInfo.SubPath)
+	util.InfoLog.Printf("destination mount success!(%s %s)", dstMountInfo, dstMountPath)
 
 	// source 확인
 	sourceStat, err := os.Stat(srcMountSubPath)
@@ -145,29 +142,35 @@ func (r *Runner) prepareDirectory() (string, string, string, error) {
 	destinationFilemode := sourceStat.Mode() | 0o700
 
 	if err := os.MkdirAll(dstMountSubPath, destinationFilemode.Perm()); err == nil {
-		log.Printf("directory %s created", dstMountSubPath)
+		util.InfoLog.Printf("directory %s created", dstMountSubPath)
 	}
 
 	return tempDir, srcMountSubPath, dstMountSubPath, nil
 }
+
 func (r *Runner) cleanupDirectory(tempPath string) {
 	if len(tempPath) == 0 {
 		return
 	}
 
+	// 볼륨 마운트 위치
 	srcMountPath := filepath.Join(tempPath, r.Common.SourceMountName)
 	dstMountPath := filepath.Join(tempPath, r.Common.DestinationMountName)
 
 	umountPaths := []string{srcMountPath, dstMountPath}
-	removePaths := []string{srcMountPath, dstMountPath, tempPath}
+	removePaths := []string{srcMountPath, dstMountPath}
+	if r.Sandboxed {
+		removePaths = append(removePaths, tempPath)
+	}
+
 	for _, path := range umountPaths {
-		if err := common.Umount(path); err != nil {
-			log.Printf("failed to unmount %s: %s", path, err)
+		if err := util.Umount(path); err != nil {
+			util.ErrLog.Printf("failed to unmount %s: %s", path, err)
 		}
 	}
 	for _, path := range removePaths {
 		if err := os.Remove(path); err != nil {
-			log.Printf("failed to remove %s: %s", path, err)
+			util.ErrLog.Printf("failed to remove %s: %s", path, err)
 		}
 	}
 }
@@ -181,12 +184,12 @@ func (r *Runner) Execute(ctx context.Context) error {
 		return err
 	}
 
-	log.Printf("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
+	util.InfoLog.Printf("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
 
 	r.logVolumeInfo(srcPath)
 	r.logVolumeInfo(dstPath)
 
-	log.Print("=> split rsync")
+	util.InfoLog.Print("=> split rsync")
 
 	rsyncInvoker := rsync.Task{
 		Arguments:       r.Common.Args.Assemble(srcPath, dstPath),
@@ -215,7 +218,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 	if err == nil && ctx.Err() == nil {
 		r.logVolumeInfo(srcPath)
 		r.logVolumeInfo(dstPath)
-		log.Printf("볼륨 싱크 완료(%s->%s)", srcPath, dstPath)
+		util.InfoLog.Printf("볼륨 싱크 완료(%s->%s)", srcPath, dstPath)
 	}
 	return err
 

@@ -2,9 +2,9 @@ package find
 
 import (
 	"context"
-	"log"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type Scanner struct {
@@ -14,14 +14,14 @@ type Scanner struct {
 	ChunkSize int
 }
 
-func (s *Scanner) Scan(ctx context.Context, root string) <-chan common.Fileinfo {
-	log.Printf("chunk size is %d", s.ChunkSize)
-	entryChan := make(chan common.Fileinfo, s.TaskSize*s.ChunkSize)
+func (s *Scanner) Scan(ctx context.Context, root string) <-chan model.Fileinfo {
+	util.InfoLog.Printf("chunk size is %d", s.ChunkSize)
+	entryChan := make(chan model.Fileinfo, s.TaskSize*s.ChunkSize)
 	if len(s.FinderBinaryPath) > 0 {
-		log.Printf("directory scan using finder")
+		util.InfoLog.Printf("directory scan using finder")
 		go s.executeFind(ctx, root, entryChan)
 	} else {
-		log.Printf("directory scan using filepath.WalkDir")
+		util.InfoLog.Printf("directory scan using filepath.WalkDir")
 		go s.scanDirectory(ctx, root, entryChan)
 	}
 	return entryChan

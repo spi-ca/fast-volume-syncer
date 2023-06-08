@@ -1,7 +1,7 @@
 //go:build !linux
 // +build !linux
 
-package common
+package util
 
 import (
 	"fmt"
@@ -25,6 +25,6 @@ func RecursiveUmount(_ string) error {
 	return fmt.Errorf("this os(%s) not supported", runtime.GOOS)
 }
 
-func ApplySandboxFlags(attr *syscall.SysProcAttr) error {
+func IsolateMountNamespaceFlags(attr *syscall.SysProcAttr) error {
 	return fmt.Errorf("this os(%s) not supported", runtime.GOOS)
 }

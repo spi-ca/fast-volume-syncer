@@ -2,14 +2,16 @@ package selector
 
 import (
 	"fmt"
-	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type Daemonizer struct {
@@ -19,7 +21,7 @@ type Daemonizer struct {
 	WorkerSize      int
 	SandboxDisabled bool
 
-	Common common.Template
+	Common model.SyncerCommonArguments
 }
 
 func (i *Daemonizer) assembleEnvironment(inherited []string) []string {
@@ -59,6 +61,9 @@ func (i *Daemonizer) openFiles() (*os.File, *os.File, error) {
 }
 
 func (i *Daemonizer) Execute() error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	logFile, nullFile, err := i.openFiles()
 	if err != nil {
 		return err
@@ -69,26 +74,31 @@ func (i *Daemonizer) Execute() error {
 		_ = logFile.Close()
 	}()
 
-	attr := os.ProcAttr{
-		Env: i.assembleEnvironment(os.Environ()),
-		Files: []*os.File{
-			nullFile, // (0) stdin
-			logFile,  // (1) stdout
-			logFile,  // (2) stderr
-		},
-		Sys: &syscall.SysProcAttr{
-			Setsid: true,
-		},
-	}
-	exe := common.Executables()
-	argv := []string{exe, "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath}
-
-	child, err := os.StartProcess(exe, argv, &attr)
+	self, err := os.Executable()
 	if err != nil {
-		return fmt.Errorf("failed to invoke a daemon process: %w", err)
+		return fmt.Errorf("failed to get self-path: %w", err)
 	}
-	_ = child.Release()
-	log.Printf("daemon process invoked! ")
+
+	invoke := exec.Command("nohup", self, "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath)
+	invoke.Stdin = nil
+	invoke.Stdout = logFile
+	invoke.Stderr = logFile
+	invoke.SysProcAttr = &syscall.SysProcAttr{
+		Setsid: true,
+	}
+	invoke.Env = i.assembleEnvironment(os.Environ())
+
+	if err = invoke.Start(); err != nil {
+		return fmt.Errorf("failed to start process(selector): %w", err)
+	}
+
+	pid := invoke.Process.Pid
+	util.InfoLog.Printf("daemon process(%d) invoked! ", pid)
+
+	err = invoke.Process.Release()
+	if err != nil {
+		return fmt.Errorf("daemon process(selector) release failed: %w", err)
+	}
+
 	return nil
-	// todo pidfile
 }

@@ -9,12 +9,13 @@ import (
 
 	"github.com/schollz/progressbar/v3"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 func TestLogger(t *testing.T) {
 	bar := progressbar.NewOptions(1000,
-		progressbar.OptionSetWriter(common.LogWriter{}),
+		progressbar.OptionSetWriter(util.LogWriter{}),
 		progressbar.OptionShowElapsedTimeOnFinish(),
 		progressbar.OptionOnCompletion(func() { log.Print("?") }),
 		progressbar.OptionShowCount(),
@@ -65,7 +66,7 @@ func TestRsyncTask_Regex(t *testing.T) {
 }
 
 func TestRsyncArgs_assembleArgs(t *testing.T) {
-	args := Args{
+	args := model.RsyncArgs{
 		Verbose:            false,
 		PreservePermission: false,
 		PreserveOwnership:  false,

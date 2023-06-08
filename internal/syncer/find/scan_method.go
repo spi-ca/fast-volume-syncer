@@ -2,18 +2,18 @@ package find
 
 import (
 	"context"
-	"log"
 	"os"
 	"path/filepath"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
-func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- common.Fileinfo) {
+func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- model.Fileinfo) {
 	defer func() {
 		close(rowChan)
 		if err := recover(); err != nil {
-			log.Printf("panic on Scanner.scanDirectory: %v", err)
+			util.ErrLog.Printf("panic on Scanner.scanDirectory: %v", err)
 		}
 	}()
 	iter := func(path string, d os.DirEntry, err error) error {
@@ -23,17 +23,17 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 
 		info, err := d.Info()
 		if err != nil {
-			log.Printf("failed to get file info: %v", err)
+			util.ErrLog.Printf("failed to get file info: %v", err)
 			return nil
 		}
 
 		relPath, err := filepath.Rel(root, path)
 		if err != nil {
-			log.Printf("failed to make relative file path info: %v", err)
+			util.ErrLog.Printf("failed to make relative file path info: %v", err)
 			return filepath.SkipDir
 		}
 
-		entry := common.Fileinfo{
+		entry := model.Fileinfo{
 			Path: relPath,
 			Mode: info.Mode(),
 			Size: info.Size(),
@@ -48,6 +48,6 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 	}
 	err := filepath.WalkDir(root, iter)
 	if err != nil {
-		log.Printf("walkdir(%s) has returned err: %v", root, err)
+		util.ErrLog.Printf("walkdir(%s) has returned err: %v", root, err)
 	}
 }

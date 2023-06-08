@@ -6,7 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 func TestScanner_testRegex(t1 *testing.T) {
@@ -38,7 +39,7 @@ func TestScanner_testRegex(t1 *testing.T) {
 
 		inode, _ := strconv.Atoi(match(1))
 		size, _ := strconv.Atoi(match(2))
-		mode := common.UnFilemodeStr(match(3))
+		mode := util.UnFilemodeStr(match(3))
 		num_of_hardlink, _ := strconv.Atoi(match(4))
 		owner := match(5)
 		group := match(6)
@@ -84,7 +85,7 @@ func TestScanner_scanDirectory(t1 *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	s := &Scanner{}
-	infoChan := make(chan common.Fileinfo)
+	infoChan := make(chan model.Fileinfo)
 	go s.scanDirectory(ctx, ".", infoChan)
 	for entry := range infoChan {
 		log.Printf("entry %v", entry)
@@ -98,7 +99,7 @@ func TestScanner_executeFindCommand(t1 *testing.T) {
 	defer cancel()
 	s := &Scanner{}
 	s.FinderBinaryPath = "find"
-	infoChan := make(chan common.Fileinfo)
+	infoChan := make(chan model.Fileinfo)
 	go s.executeFind(ctx, ".", infoChan)
 	for entry := range infoChan {
 		log.Printf("entry %v", entry)

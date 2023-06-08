@@ -1,15 +1,14 @@
 package selector
 
 import (
-	"bufio"
 	"context"
 	"encoding/csv"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
-	"unicode"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type Runner struct {
@@ -31,13 +30,13 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader) <-chan 
 		rdr := csv.NewReader(reader)
 		row, err := rdr.Read()
 		if err != nil {
-			log.Printf("readline failed: %v", err)
+			util.ErrLog.Printf("readline failed: %v", err)
 			return
 		}
 
 		i := 0
 		defer func() {
-			log.Printf("read %d items", i)
+			util.InfoLog.Printf("read %d items", i)
 		}()
 
 		// csv 내용 모두 읽기
@@ -46,7 +45,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader) <-chan 
 				err = nil
 				break
 			} else if err != nil {
-				log.Printf("read csv failed: %v", err)
+				util.ErrLog.Printf("read csv failed: %v", err)
 				return
 			}
 
@@ -62,7 +61,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader) <-chan 
 
 			nodeNum, err := strconv.Atoi(row[0])
 			if err != nil {
-				log.Printf("node field parse  failed: %v", err)
+				util.ErrLog.Printf("node field parse  failed: %v", err)
 				continue
 			} else if r.NodeSelector > 0 && r.NodeSelector != nodeNum {
 				continue
@@ -77,7 +76,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader) <-chan 
 
 			entry.ProjectId, err = strconv.Atoi(row[5])
 			if err != nil {
-				log.Printf("project_id field parse  failed: %v", err)
+				util.ErrLog.Printf("project_id field parse  failed: %v", err)
 				continue
 			}
 
@@ -85,7 +84,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader) <-chan 
 
 			entry.UsedSize, err = strconv.ParseInt(row[7], 10, 64)
 			if err != nil {
-				log.Printf("project_id field parse  failed: %v", err)
+				util.ErrLog.Printf("project_id field parse  failed: %v", err)
 				continue
 			}
 
@@ -93,7 +92,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader) <-chan 
 			entry.VolumeType = strings.TrimSpace(row[9])
 			entry.VolumeSize, err = strconv.ParseInt(row[10], 10, 64)
 			if err != nil {
-				log.Printf("project_id field parse  failed: %v", err)
+				util.ErrLog.Printf("project_id field parse  failed: %v", err)
 				continue
 			}
 			entry.VolumeSizeHuman = strings.TrimSpace(row[11])
@@ -107,14 +106,6 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader) <-chan 
 
 	}(entryChan)
 	return entryChan
-}
-
-func (r *Runner) logLineByLine(reader io.Reader, prefix string) {
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
-		log.Print(prefix, line)
-	}
 }
 
 func (r *Runner) Execute(ctx context.Context) error {
@@ -132,7 +123,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 	joiner := newWorkerJoiner(r.WorkerSize, &r.Template)
 	err := joiner.Execute(ctx, entryChan)
 	if err == nil && ctx.Err() == nil {
-		log.Print("복사 목록 로드 완료")
+		util.InfoLog.Print("복사 목록 로드 완료")
 	}
 	return err
 }

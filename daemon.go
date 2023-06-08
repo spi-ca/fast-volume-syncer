@@ -2,10 +2,10 @@ package main
 
 import (
 	"github.com/spf13/viper"
-	"log"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/selector"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 func daemonStopEntry() {
@@ -15,36 +15,36 @@ func daemonStopEntry() {
 
 func daemonStartEntry() {
 
-	log.Print("args:")
-	log.Print("	pid.file=", viper.GetString("pid.file"))
-	log.Print("	log.file=", viper.GetString("log.file"))
-	log.Print("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
-	log.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
-	log.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
-	log.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
-	log.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
-	log.Print("	rsync.special=", viper.GetBool("rsync.special"))
-	log.Print("	rsync.compress=", viper.GetBool("rsync.compress"))
-	log.Print("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
-	log.Print("	rsync.inplace=", viper.GetBool("rsync.inplace"))
-	log.Print("	rsync.recursive=", viper.GetBool("rsync.recursive"))
-	log.Print("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
-	log.Print("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
-	log.Print("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
-	log.Print("	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"))
-	log.Print("	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"))
-	log.Print("	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"))
-	log.Print("	scan.deadline=", viper.GetDuration("scan.deadline"))
-	log.Print("	scan.find.path=", viper.GetString("scan.find.path"))
-	log.Print("	worker.size=", viper.GetString("worker.size"))
-	log.Print("	task.size=", viper.GetInt("task.size"))
-	log.Print("	chunk.size=", viper.GetInt("chunk.size"))
-	log.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
-	log.Print("	retry.delay=", viper.GetDuration("retry.delay"))
-	log.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
-	log.Print("	retry.max.jiiter=", viper.GetDuration("retry.max.jiiter"))
-	log.Print("	sandboxSupported=", sandboxSupported)
-	log.Print("---")
+	util.InfoLog.Print("args:")
+	util.InfoLog.Print("	pid.file=", viper.GetString("pid.file"))
+	util.InfoLog.Print("	log.file=", viper.GetString("log.file"))
+	util.InfoLog.Print("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
+	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
+	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
+	util.InfoLog.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
+	util.InfoLog.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
+	util.InfoLog.Print("	rsync.special=", viper.GetBool("rsync.special"))
+	util.InfoLog.Print("	rsync.compress=", viper.GetBool("rsync.compress"))
+	util.InfoLog.Print("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
+	util.InfoLog.Print("	rsync.inplace=", viper.GetBool("rsync.inplace"))
+	util.InfoLog.Print("	rsync.recursive=", viper.GetBool("rsync.recursive"))
+	util.InfoLog.Print("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
+	util.InfoLog.Print("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
+	util.InfoLog.Print("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
+	util.InfoLog.Print("	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"))
+	util.InfoLog.Print("	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"))
+	util.InfoLog.Print("	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"))
+	util.InfoLog.Print("	scan.deadline=", viper.GetDuration("scan.deadline"))
+	util.InfoLog.Print("	scan.find.path=", viper.GetString("scan.find.path"))
+	util.InfoLog.Print("	worker.size=", viper.GetString("worker.size"))
+	util.InfoLog.Print("	task.size=", viper.GetInt("task.size"))
+	util.InfoLog.Print("	chunk.size=", viper.GetInt("chunk.size"))
+	util.InfoLog.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
+	util.InfoLog.Print("	retry.delay=", viper.GetDuration("retry.delay"))
+	util.InfoLog.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
+	util.InfoLog.Print("	retry.max.jiiter=", viper.GetDuration("retry.max.jiiter"))
+	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
+	util.InfoLog.Print("---")
 
 	runner := selector.Daemonizer{
 		NodeSelector:    argNodeSelector,
@@ -52,9 +52,9 @@ func daemonStartEntry() {
 		LogFilePath:     viper.GetString("log.file"),
 		WorkerSize:      viper.GetInt("worker.size"),
 		SandboxDisabled: viper.GetBool("sandbox.disabled") || !sandboxSupported,
-		Common: common.Template{
+		Common: model.SyncerCommonArguments{
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
-			Args: common.RsyncArgs{
+			Args: model.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),
 				PreservePermission: viper.GetBool("rsync.perms"),
 				PreserveOwnership:  viper.GetBool("rsync.owner"),
@@ -83,7 +83,7 @@ func daemonStartEntry() {
 		},
 	}
 	if err := runner.Execute(); err != nil {
-		log.Fatal(err)
+		util.ErrLog.Fatal(err)
 	}
-	log.Println("daemon started")
+	util.InfoLog.Println("daemon started")
 }

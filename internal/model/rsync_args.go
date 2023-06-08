@@ -1,4 +1,4 @@
-package common
+package model
 
 type RsyncArgs struct {
 	Verbose            bool

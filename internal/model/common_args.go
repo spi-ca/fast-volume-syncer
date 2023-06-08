@@ -1,4 +1,4 @@
-package common
+package model
 
 import (
 	"strconv"
@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type Template struct {
+type SyncerCommonArguments struct {
 	SandboxMountOption string
 
 	Args RsyncArgs
@@ -31,7 +31,7 @@ type Template struct {
 	RetryMaxJitter time.Duration
 }
 
-func (i *Template) AssembleEnvironment(inherited []string) []string {
+func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string {
 	envs := make([]string, 0, 23)
 
 	envs = append(envs, "SANDBOX_MOUNT_OPTION", i.SandboxMountOption)

@@ -1,7 +1,6 @@
 package rsync
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"os/exec"
@@ -11,7 +10,7 @@ import (
 
 	"github.com/avast/retry-go"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type exitCodeResult struct {
@@ -59,6 +58,25 @@ type result struct {
 	pid           int
 	err           error
 	started       time.Time
+
+	stderrLastLogLineStartIdx int
+	stderrLastLogLines        [5]string
+}
+
+func (r *result) appendLogLine(line string) {
+	r.stderrLastLogLines[r.stderrLastLogLineStartIdx] = line
+	r.stderrLastLogLineStartIdx = (r.stderrLastLogLineStartIdx + 1) % len(r.stderrLastLogLines)
+}
+
+func (r *result) lastLogLine() []string {
+	loglines := make([]string, 0, len(r.stderrLastLogLines))
+	for i := 0; i < len(r.stderrLastLogLines); i++ {
+		logline := r.stderrLastLogLines[(r.stderrLastLogLineStartIdx+i)%len(r.stderrLastLogLines)]
+		if len(logline) > 0 {
+			loglines = append(loglines, logline)
+		}
+	}
+	return loglines
 }
 
 func (r *result) appendFilename(filename string) {
@@ -92,17 +110,17 @@ func (r *result) String() string {
 		_, _ = fmt.Fprintf(buf, " in %2.2f ms", float32(elapsed.Microseconds())/1000)
 		if r.sentBytes > 0 {
 			buf.WriteString(" sent ")
-			buf.WriteString(common.FileSizeIEC(r.sentBytes))
+			buf.WriteString(util.FileSizeIEC(r.sentBytes))
 			bytesPerSeconds := int64(float64(r.sentBytes) / math.Max(elapsed.Seconds(), 0.001))
 			if bytesPerSeconds > 0 {
 				buf.WriteString("(")
-				buf.WriteString(common.FileSizeIEC(bytesPerSeconds))
+				buf.WriteString(util.FileSizeIEC(bytesPerSeconds))
 				buf.WriteString("/s)")
 			}
 		}
 	} else if r.sentBytes > 0 {
 		buf.WriteString(" sent ")
-		buf.WriteString(common.FileSizeIEC(r.sentBytes))
+		buf.WriteString(util.FileSizeIEC(r.sentBytes))
 	}
 	if r.total > 0 {
 		_, _ = fmt.Fprintf(buf, " total(%d) = sent(%d) + uptodate(%d) + untouched(%d), processing(%d)",
@@ -157,12 +175,55 @@ func (r *result) rsyncExitResult() (error, bool) {
 	if _res, ok := exitCodeMap[exitcode]; ok {
 		res = _res
 	}
+
 	if res.Success {
 		return nil, true
-	} else if err := r.err; err != nil {
-		return fmt.Errorf("%s: %w", res.Message, err), res.Retryable
-	} else {
-		return errors.New(res.Message), res.Retryable
 	}
 
+	buf := &strings.Builder{}
+	lastLoglines := r.lastLogLine()
+	lastListFiles := r.listFilename()
+
+	if len(lastLoglines) > 0 || len(lastListFiles) > 0 {
+		buf.WriteString(", ")
+	}
+	if num := len(lastLoglines); num > 0 {
+		_, _ = fmt.Fprintf(buf, "\n=> last %d log", num)
+		if num > 1 {
+			buf.WriteByte('s')
+		}
+		buf.WriteString(" = [\n")
+		for idx, filename := range lastLoglines {
+			buf.WriteString("\t'")
+			buf.WriteString(filename)
+			buf.WriteByte('\'')
+			if idx+1 < num {
+				buf.WriteByte(',')
+			}
+			buf.WriteByte('\n')
+		}
+		buf.WriteByte(']')
+	}
+	if num := len(lastListFiles); num > 0 {
+		_, _ = fmt.Fprintf(buf, "\n=> last %d sent file", num)
+		if num > 1 {
+			buf.WriteByte('s')
+		}
+		buf.WriteString(" = [\n")
+		for idx, filename := range lastListFiles {
+			buf.WriteString("\t'")
+			buf.WriteString(filename)
+			buf.WriteByte('\'')
+			if idx+1 < num {
+				buf.WriteByte(',')
+			}
+			buf.WriteByte('\n')
+		}
+		buf.WriteByte(']')
+	}
+	if err := r.err; err != nil {
+		return fmt.Errorf("%s: %w%s", res.Message, err, buf.String()), res.Retryable
+	} else {
+		return fmt.Errorf("%s%s", res.Message, buf.String()), res.Retryable
+	}
 }

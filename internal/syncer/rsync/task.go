@@ -20,7 +20,8 @@ import (
 
 	"github.com/avast/retry-go"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 var (
@@ -36,7 +37,7 @@ type Task struct {
 	RetryMaxJitter  time.Duration
 }
 
-func (t *Task) Execute(ctx context.Context, fileList []common.Fileinfo) error {
+func (t *Task) Execute(ctx context.Context, fileList []model.Fileinfo) error {
 
 	if t.RetryAttempts <= 0 {
 		return t.execute(ctx, fileList)
@@ -68,7 +69,7 @@ func (t *Task) Execute(ctx context.Context, fileList []common.Fileinfo) error {
 	)
 }
 
-func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}, fileList []common.Fileinfo) {
+func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}, fileList []model.Fileinfo) {
 	defer close(closeChan)
 	if writer == nil {
 		return
@@ -87,7 +88,7 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 			dirMode := mode.Perm() | 0o700
 			dirPath := filepath.Join(t.DestinationPath, entry.Path)
 			if err := os.MkdirAll(dirPath, dirMode); err != nil {
-				log.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
+				util.ErrLog.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
 			}
 		} else if mode.IsRegular() || (mode&fs.ModeSymlink != 0) {
 			if addSep {
@@ -103,7 +104,7 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 
 }
 
-func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []common.Fileinfo, closeChan chan struct{}) {
+func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []model.Fileinfo, closeChan chan struct{}) {
 	defer close(closeChan)
 
 	prefix := fmt.Sprintf("[%d]&1> ", res.pid)
@@ -112,7 +113,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []commo
 	if len(fileList) == 0 {
 		for scanner.Scan() {
 			line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
-			log.Print(prefix, line)
+			util.InfoLog.Print(prefix, line)
 		}
 		return
 	}
@@ -123,7 +124,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []commo
 	}
 
 	bar := progressbar.NewOptions(res.total,
-		progressbar.OptionSetWriter(common.LogWriter{}),
+		progressbar.OptionSetWriter(util.LogWriter{}),
 		progressbar.OptionShowElapsedTimeOnFinish(),
 		progressbar.OptionShowCount(),
 		progressbar.OptionShowIts(),
@@ -182,24 +183,25 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []commo
 
 }
 
-func (t *Task) handleRsyncStderr(pid int, reader io.Reader, closeChan chan<- struct{}) {
+func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closeChan chan<- struct{}) {
 	defer close(closeChan)
-	prefix := fmt.Sprintf("[%d]&2> ", pid)
+	prefix := fmt.Sprintf("[%d]&2> ", res.pid)
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
-		log.Print(prefix, line)
+		res.appendLogLine(line)
+		util.ErrLog.Print(prefix, line)
 	}
 }
 
-func (t *Task) execute(ctx context.Context, fileList []common.Fileinfo) error {
+func (t *Task) execute(ctx context.Context, fileList []model.Fileinfo) error {
 	invoke := exec.CommandContext(
 		ctx,
 		"rsync",
 		t.Arguments...,
 	)
 
-	invoke.Env = append([]string(nil), os.Environ()...)
+	invoke.Env = os.Environ()
 	stdin, _ := invoke.StdinPipe()
 	stdout, _ := invoke.StdoutPipe()
 	stderr, _ := invoke.StderrPipe()
@@ -216,7 +218,7 @@ func (t *Task) execute(ctx context.Context, fileList []common.Fileinfo) error {
 	go t.handleRsyncStdout(res, stdout, fileList, stdoutClosed)
 
 	stderrClosed := make(chan struct{})
-	go t.handleRsyncStderr(res.pid, stderr, stderrClosed)
+	go t.handleRsyncStderr(res, stderr, stderrClosed)
 
 	<-stdinClosed
 
@@ -228,6 +230,6 @@ func (t *Task) execute(ctx context.Context, fileList []common.Fileinfo) error {
 	}
 
 	res.err = invoke.Wait()
-	log.Print(res)
+	util.InfoLog.Print(res)
 	return res.HandleError()
 }

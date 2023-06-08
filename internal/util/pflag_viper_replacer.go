@@ -1,4 +1,4 @@
-package common
+package util
 
 import (
 	flags "github.com/spf13/pflag"
@@ -8,40 +8,40 @@ import (
 
 // pflagValue is a wrapper aroung *flags.flag
 // that implements FlagValue
-type flagValue struct {
+type pflagViperValue struct {
 	flag *flags.Flag
 }
 
 // HasChanged returns whether the flag has changes or not.
-func (p flagValue) HasChanged() bool {
+func (p pflagViperValue) HasChanged() bool {
 	return p.flag.Changed
 }
 
 // Name returns the name of the flag.
-func (p flagValue) Name() string {
+func (p pflagViperValue) Name() string {
 	return p.flag.Name
 }
 
 // ValueString returns the value of the flag as a string.
-func (p flagValue) ValueString() string {
+func (p pflagViperValue) ValueString() string {
 	return p.flag.Value.String()
 }
 
 // ValueType returns the type of the flag as a string.
-func (p flagValue) ValueType() string {
+func (p pflagViperValue) ValueType() string {
 	return p.flag.Value.Type()
 }
 
-type PFlagReplacer struct {
+type PFlagViperReplacer struct {
 	*flags.FlagSet
 	Replacer *strings.Replacer
 }
 
 // VisitAll iterates over all *flags.Flag inside the *flags.FlagSet.
-func (p PFlagReplacer) VisitAll(fn func(flag viper.FlagValue)) {
+func (p PFlagViperReplacer) VisitAll(fn func(flag viper.FlagValue)) {
 	p.FlagSet.VisitAll(p.bindPFlagToViper)
 }
 
-func (r PFlagReplacer) bindPFlagToViper(flag *flags.Flag) {
-	_ = viper.BindFlagValue(r.Replacer.Replace(flag.Name), flagValue{flag})
+func (r PFlagViperReplacer) bindPFlagToViper(flag *flags.Flag) {
+	_ = viper.BindFlagValue(r.Replacer.Replace(flag.Name), pflagViperValue{flag})
 }

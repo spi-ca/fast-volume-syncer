@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"strconv"
@@ -12,8 +11,9 @@ import (
 
 	"github.com/spf13/viper"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/model"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 func syncerEntry() {
@@ -28,7 +28,7 @@ func syncerEntry() {
 		case <-ctx.Done():
 			return
 		case sysSignal := <-exitSignal:
-			log.Println(sysSignal.String(), " received")
+			util.ErrLog.Println(sysSignal.String(), " received")
 			cancel()
 			return
 		}
@@ -39,56 +39,56 @@ func syncerEntry() {
 	sandboxed, _ := strconv.ParseBool(os.Getenv("_SYNCER_SANDBOXED"))
 
 	if daemonized || selectorInvoked {
-		log.SetFlags(0)
+		util.SetLogFlags(0)
 	} else {
-		prefix := fmt.Sprintf("syncer[%d] ", os.Getpid())
-		log.SetPrefix(prefix)
+		util.InfoLog.SetPrefix(fmt.Sprintf("syncer[%d]&1> ", os.Getpid()))
+		util.ErrLog.SetPrefix(fmt.Sprintf("syncer[%d]&2> ", os.Getpid()))
 	}
 
 	// debug
-	log.Print("args:")
-	log.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
-	log.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
-	log.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
-	log.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
-	log.Print("	rsync.special=", viper.GetBool("rsync.special"))
-	log.Print("	rsync.compress=", viper.GetBool("rsync.compress"))
-	log.Print("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
-	log.Print("	rsync.inplace=", viper.GetBool("rsync.inplace"))
-	log.Print("	rsync.recursive=", viper.GetBool("rsync.recursive"))
-	log.Print("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
-	log.Print("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
-	log.Print("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
-	log.Print("	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"))
-	log.Print("	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"))
-	log.Print("	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"))
-	log.Print("	scan.deadline=", viper.GetDuration("scan.deadline"))
-	log.Print("	scan.find.path=", viper.GetString("scan.find.path"))
-	log.Print("	task.size=", viper.GetInt("task.size"))
-	log.Print("	chunk.size=", viper.GetInt("chunk.size"))
-	log.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
-	log.Print("	retry.delay=", viper.GetDuration("retry.delay"))
-	log.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
-	log.Print("	retry.max.jiiter=", viper.GetDuration("retry.max.jiiter"))
-	log.Print("	daemonized=", daemonized)
-	log.Print("	selectorInvoked=", selectorInvoked)
-	log.Print("	sandboxSupported=", sandboxSupported)
-	log.Print("	sandboxed=", sandboxed)
-	log.Print("	argSrcStoragePath=", argSrcStoragePath)
-	log.Print("	argSrcStorageSubPath=", argSrcStorageSubPath)
-	log.Print("	argDstStoragePath=", argDstStoragePath)
-	log.Print("	argDstStorageSubPath=", argDstStorageSubPath)
-	log.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
-	log.Print("	env['_SYNCER_INVOKED']=", os.Getenv("_SYNCER_INVOKED"))
-	log.Print("	env['_SYNCER_SANDBOXED']=", os.Getenv("_SYNCER_SANDBOXED"))
-	log.Print("---")
+	util.InfoLog.Print("args:")
+	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
+	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
+	util.InfoLog.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
+	util.InfoLog.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
+	util.InfoLog.Print("	rsync.special=", viper.GetBool("rsync.special"))
+	util.InfoLog.Print("	rsync.compress=", viper.GetBool("rsync.compress"))
+	util.InfoLog.Print("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
+	util.InfoLog.Print("	rsync.inplace=", viper.GetBool("rsync.inplace"))
+	util.InfoLog.Print("	rsync.recursive=", viper.GetBool("rsync.recursive"))
+	util.InfoLog.Print("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
+	util.InfoLog.Print("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
+	util.InfoLog.Print("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
+	util.InfoLog.Print("	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"))
+	util.InfoLog.Print("	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"))
+	util.InfoLog.Print("	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"))
+	util.InfoLog.Print("	scan.deadline=", viper.GetDuration("scan.deadline"))
+	util.InfoLog.Print("	scan.find.path=", viper.GetString("scan.find.path"))
+	util.InfoLog.Print("	task.size=", viper.GetInt("task.size"))
+	util.InfoLog.Print("	chunk.size=", viper.GetInt("chunk.size"))
+	util.InfoLog.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
+	util.InfoLog.Print("	retry.delay=", viper.GetDuration("retry.delay"))
+	util.InfoLog.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
+	util.InfoLog.Print("	retry.max.jiiter=", viper.GetDuration("retry.max.jiiter"))
+	util.InfoLog.Print("	daemonized=", daemonized)
+	util.InfoLog.Print("	selectorInvoked=", selectorInvoked)
+	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
+	util.InfoLog.Print("	sandboxed=", sandboxed)
+	util.InfoLog.Print("	argSrcStoragePath=", argSrcStoragePath)
+	util.InfoLog.Print("	argSrcStorageSubPath=", argSrcStorageSubPath)
+	util.InfoLog.Print("	argDstStoragePath=", argDstStoragePath)
+	util.InfoLog.Print("	argDstStorageSubPath=", argDstStorageSubPath)
+	util.InfoLog.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
+	util.InfoLog.Print("	env['_SYNCER_INVOKED']=", os.Getenv("_SYNCER_INVOKED"))
+	util.InfoLog.Print("	env['_SYNCER_SANDBOXED']=", os.Getenv("_SYNCER_SANDBOXED"))
+	util.InfoLog.Print("---")
 	//return
 
 	runner := syncer.Runner{
 		Sandboxed: selectorInvoked && sandboxed && sandboxSupported,
-		Common: common.Template{
+		Common: model.SyncerCommonArguments{
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
-			Args: common.RsyncArgs{
+			Args: model.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),
 				PreservePermission: viper.GetBool("rsync.perms"),
 				PreserveOwnership:  viper.GetBool("rsync.owner"),
@@ -121,8 +121,8 @@ func syncerEntry() {
 	}
 	started := time.Now()
 	if err := runner.Execute(ctx); err != nil {
-		log.Fatal(err)
+		util.ErrLog.Fatal(err)
 	}
 	ended := time.Now()
-	log.Printf("completed: in %s", ended.Sub(started))
+	util.InfoLog.Printf("completed: in %s", ended.Sub(started))
 }

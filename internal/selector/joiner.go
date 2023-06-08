@@ -2,9 +2,11 @@ package selector
 
 import (
 	"context"
-	"go.uber.org/multierr"
-	"log"
 	"sync"
+
+	"go.uber.org/multierr"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type workerJoiner struct {
@@ -38,7 +40,7 @@ func (c *workerJoiner) dispatch(parentCtx context.Context, entryRecvChan <-chan 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("panic on workerJoiner: %v", err)
+			util.ErrLog.Printf("panic on workerJoiner: %v", err)
 		}
 		c.wg.Wait()
 		close(c.errorChan)

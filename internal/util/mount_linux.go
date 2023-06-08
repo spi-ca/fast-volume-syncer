@@ -1,12 +1,11 @@
 //go:build linux
 // +build linux
 
-package common
+package util
 
 import (
 	"fmt"
 	"github.com/moby/sys/mount"
-	"log"
 	"os"
 	"syscall"
 )
@@ -44,7 +43,7 @@ func Sandbox(sandboxMountOption string) error {
 		return fmt.Errorf("failed to mount %s : %w", tmpDir, err)
 	}
 
-	log.Printf("the process is sandboxed")
+	InfoLog.Print("the process is sandboxed")
 	return nil
 }
 
@@ -69,7 +68,7 @@ func RecursiveUmounts(destinationPath string) error {
 	return mount.RecursiveUnmount(destinationPath)
 }
 
-func ApplySandboxFlags(attr *syscall.SysProcAttr) error {
+func IsolateMountNamespaceFlags(attr *syscall.SysProcAttr) error {
 	attr.Unshareflags |= syscall.CLONE_NEWNS | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_FS
 	return nil
 }

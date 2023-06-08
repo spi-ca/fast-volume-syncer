@@ -12,7 +12,7 @@ import (
 
 	flags "github.com/spf13/pflag"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/common"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 const (
@@ -39,11 +39,9 @@ var (
 
 func init() {
 	flags.String("log-file", fmt.Sprintf("log/%s.log", name), "(daemon only)specify a log file")
+	flags.String("pid-file", fmt.Sprintf("%s.pid", name), "(daemon only)specify a pid file")
 	flags.Bool("sandbox-disabled", false, "(selector only)without namespace isolation")
 	flags.IntP("worker-size", "w", 5, "(selector only)specifies the maximum number of syncer processes that can run concurrently")
-
-	// todo pid file
-	//flags.String("pid-file", fmt.Sprintf("%s.pid", name), "(daemon only)specify a pid file")
 
 	flags.String("sandbox-mount-option", "size=150M,mode=700,nosuid,noexec,nodev", "(selector only)sandbox mount option")
 	flags.Bool("rsync-verbose", false, "make rsync verbosely")
@@ -72,7 +70,7 @@ func init() {
 	flags.Parse()
 	viper.SetEnvKeyReplacer(envNameReplacer)
 	viper.AutomaticEnv()
-	_ = viper.BindFlagValues(common.PFlagReplacer{flags.CommandLine, flagNameReplacer})
+	_ = viper.BindFlagValues(util.PFlagViperReplacer{FlagSet: flags.CommandLine, Replacer: flagNameReplacer})
 
 	flags.CommandLine.SetNormalizeFunc(nil)
 	consumedArgs := 0
