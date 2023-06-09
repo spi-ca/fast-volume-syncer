@@ -29,6 +29,7 @@ var (
 )
 
 func init() {
+	flags.Bool("monitoring-disabled", false, "(daemon only)without slack monitoring")
 	flags.String("log-file", fmt.Sprintf("log/%s.log", name), "(daemon only)specify a log file")
 	flags.String("pid-file", fmt.Sprintf("%s.pid", name), "(daemon only)specify a pid file")
 	flags.Bool("sandbox-disabled", false, "(selector only)without namespace isolation")

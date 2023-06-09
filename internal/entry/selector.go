@@ -35,6 +35,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 	}()
 
 	daemonized, _ := strconv.ParseBool(os.Getenv("_FVS_DAEMONEZED"))
+	slackMonitoring, _ := strconv.ParseBool(os.Getenv("_SLACK_MONITORING"))
 
 	util.InfoLog.Print("args:")
 	util.InfoLog.Print("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
@@ -66,6 +67,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 	util.InfoLog.Print("	daemonized=", daemonized)
 	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
 	util.InfoLog.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
+	util.InfoLog.Print("	env['_SLACK_MONITORING']=", os.Getenv("_SLACK_MONITORING"))
 	util.InfoLog.Print("---")
 
 	if daemonized {
@@ -77,8 +79,10 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 			}
 			defer closer()
 		}
-		util.SlackSender.Start()
-		defer util.SlackSender.Close()
+		if slackMonitoring {
+			util.SlackSender.Start()
+			defer util.SlackSender.Close()
+		}
 	}
 
 	runner := selector.Runner{

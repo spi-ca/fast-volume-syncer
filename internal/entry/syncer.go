@@ -74,7 +74,6 @@ func Syncer(
 	util.InfoLog.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
 	util.InfoLog.Print("	retry.max.jitter=", viper.GetDuration("retry.max.jitter"))
 	util.InfoLog.Print("	daemonized=", daemonized)
-	util.InfoLog.Print("	selectorInvoked=", selectorInvoked)
 	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
 	util.InfoLog.Print("	sandboxed=", sandboxed)
 	util.InfoLog.Print("	argSrcStoragePath=", srcStoragePath)
@@ -84,6 +83,7 @@ func Syncer(
 	util.InfoLog.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
 	util.InfoLog.Print("	env['_SYNCER_INVOKED']=", os.Getenv("_SYNCER_INVOKED"))
 	util.InfoLog.Print("	env['_SYNCER_SANDBOXED']=", os.Getenv("_SYNCER_SANDBOXED"))
+	util.InfoLog.Print("	env['_SLACK_MONITORING']=", os.Getenv("_SLACK_MONITORING"))
 	util.InfoLog.Print("---")
 	//return
 

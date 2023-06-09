@@ -38,6 +38,7 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 	util.InfoLog.Print("args:")
 	util.InfoLog.Print("	pid.file=", viper.GetString("pid.file"))
 	util.InfoLog.Print("	log.file=", viper.GetString("log.file"))
+	util.InfoLog.Print("	monitoring.disabled=", viper.GetBool("monitoring.disabled"))
 	util.InfoLog.Print("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
 	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
 	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
@@ -68,6 +69,7 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 	util.InfoLog.Print("---")
 
 	runner := selector.Daemonizer{
+		SlackMonitoring: !viper.GetBool("monitoring.disabled"),
 		NodeSelector:    nodeSelector,
 		CopyInfoCSVPath: copyInfoFilePath,
 		PidFilePath:     viper.GetString("pid.file"),
