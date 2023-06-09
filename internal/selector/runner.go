@@ -20,92 +20,91 @@ type Runner struct {
 	Template Invoker
 }
 
-func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader) <-chan copyEntry {
-	entryChan := make(chan copyEntry, r.WorkerSize)
-	go func(rowChan chan<- copyEntry) {
-		defer close(rowChan)
-		const entryNum = 12
-		// csv reader 생성
+func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryChan chan<- copyEntry) {
+	defer close(entryChan)
+	const entryNum = 12
+	// csv reader 생성
 
-		rdr := csv.NewReader(reader)
-		row, err := rdr.Read()
-		if err != nil {
-			util.ErrLog.Printf("readline failed: %v", err)
+	rdr := csv.NewReader(reader)
+	row, err := rdr.Read()
+	if err != nil {
+		util.ErrLog.Printf("readline failed: %v", err)
+		return
+	}
+
+	i := 0
+	defer func() {
+		util.InfoLog.Printf("read %d items", i)
+	}()
+
+	// csv 내용 모두 읽기
+	for row, err = rdr.Read(); err == nil; row, err = rdr.Read() {
+		if err == io.EOF {
+			err = nil
+			break
+		} else if err != nil {
+			util.ErrLog.Printf("read csv failed: %v", err)
 			return
 		}
 
-		i := 0
-		defer func() {
-			util.InfoLog.Printf("read %d items", i)
-		}()
-
-		// csv 내용 모두 읽기
-		for row, err = rdr.Read(); err == nil; row, err = rdr.Read() {
-			if err == io.EOF {
-				err = nil
-				break
-			} else if err != nil {
-				util.ErrLog.Printf("read csv failed: %v", err)
-				return
-			}
-
-			if len(row) < entryNum {
-				continue
-			} else if len(row) > entryNum {
-				row = row[:entryNum]
-			}
-
-			if strings.HasPrefix(row[0], "#") {
-				continue
-			}
-
-			nodeNum, err := strconv.Atoi(row[0])
-			if err != nil {
-				util.ErrLog.Printf("node field parse  failed: %v", err)
-				continue
-			} else if r.NodeSelector > 0 && r.NodeSelector != nodeNum {
-				continue
-			}
-
-			var entry = copyEntry{}
-			entry.Node = nodeNum
-			entry.SourceVolume = strings.TrimSpace(row[1])
-			entry.DestinationVolume = strings.TrimSpace(row[2])
-			entry.SourcePath = strings.TrimSpace(row[3])
-			entry.DestinationPath = strings.TrimSpace(row[4])
-
-			entry.ProjectId, err = strconv.Atoi(row[5])
-			if err != nil {
-				util.ErrLog.Printf("project_id field parse  failed: %v", err)
-				continue
-			}
-
-			entry.ProjectName = strings.TrimSpace(row[6])
-
-			entry.UsedSize, err = strconv.ParseInt(row[7], 10, 64)
-			if err != nil {
-				util.ErrLog.Printf("project_id field parse  failed: %v", err)
-				continue
-			}
-
-			entry.UsedSizeHuman = strings.TrimSpace(row[8])
-			entry.VolumeType = strings.TrimSpace(row[9])
-			entry.VolumeSize, err = strconv.ParseInt(row[10], 10, 64)
-			if err != nil {
-				util.ErrLog.Printf("project_id field parse  failed: %v", err)
-				continue
-			}
-			entry.VolumeSizeHuman = strings.TrimSpace(row[11])
-			select {
-			case <-ctx.Done():
-				return
-			case rowChan <- entry:
-				i++
-			}
+		if len(row) < entryNum {
+			continue
+		} else if len(row) > entryNum {
+			row = row[:entryNum]
 		}
 
-	}(entryChan)
-	return entryChan
+		if strings.HasPrefix(row[0], "#") {
+			continue
+		}
+
+		nodeNum, err := strconv.Atoi(row[0])
+		if err != nil {
+			util.ErrLog.Printf("node field parse  failed: %v", err)
+			continue
+		} else if r.NodeSelector > 0 && r.NodeSelector != nodeNum {
+			continue
+		}
+
+		var entry = copyEntry{}
+		entry.Node = nodeNum
+		entry.SourceVolume = strings.TrimSpace(row[1])
+		entry.DestinationVolume = strings.TrimSpace(row[2])
+		entry.SourcePath = strings.TrimSpace(row[3])
+		entry.DestinationPath = strings.TrimSpace(row[4])
+
+		entry.SourceProjectId, err = strconv.Atoi(row[5])
+		if err != nil {
+			util.ErrLog.Printf("project_id field parse  failed: %v", err)
+			continue
+		}
+
+		entry.SourceProjectName = strings.TrimSpace(row[6])
+
+		entry.UsedSize, err = strconv.ParseInt(row[7], 10, 64)
+		if err != nil {
+			util.ErrLog.Printf("project_id field parse  failed: %v", err)
+			continue
+		}
+
+		entry.UsedSizeHuman = strings.TrimSpace(row[8])
+		entry.VolumeType = strings.TrimSpace(row[9])
+		entry.VolumeSize, err = strconv.ParseInt(row[10], 10, 64)
+		if err != nil {
+			util.ErrLog.Printf("project_id field parse  failed: %v", err)
+			continue
+		}
+		entry.VolumeSizeHuman = strings.TrimSpace(row[11])
+		entry.DestinationProjectName = strings.TrimSpace(row[12])
+		entry.VolumeName = strings.TrimSpace(row[13])
+		entry.SourceVolumeKey = strings.TrimSpace(row[14])
+		select {
+		case <-ctx.Done():
+			return
+		case entryChan <- entry:
+			i++
+		}
+	}
+
 }
 
 func (r *Runner) Execute(ctx context.Context) error {
@@ -119,7 +118,8 @@ func (r *Runner) Execute(ctx context.Context) error {
 		f = rawFile
 	}
 
-	entryChan := r.loadCopyEntryCSV(ctx, f)
+	entryChan := make(chan copyEntry, r.WorkerSize)
+	go r.loadCopyEntryCSV(ctx, f, entryChan)
 	joiner := newWorkerJoiner(r.WorkerSize, &r.Template)
 
 	err := joiner.Execute(ctx, entryChan)

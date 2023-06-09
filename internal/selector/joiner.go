@@ -3,6 +3,7 @@ package selector
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
@@ -67,5 +68,7 @@ func (c *workerJoiner) submit(ctx context.Context, entry copyEntry, errorChan ch
 	}()
 	if err := c.invoker.Run(ctx, entry); err != nil {
 		errorChan <- err
+	} else {
+		util.SendSlackMessage(fmt.Sprintf("복사항목 복사 완료 %s", entry))
 	}
 }
