@@ -16,7 +16,7 @@ import (
 	"unicode"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
-	util2 "amuz.es/src/spi-ca/fast-volume-syncer/internal/system"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -44,7 +44,7 @@ func (s *Scanner) parseFindEntry(line []byte) (*returns.Fileinfo, error) {
 
 	//inode, _ := strconv.Atoi(match(1))
 	size := util.SimpleStrconv(match(2))
-	mode := util2.UnFilemode(match(3))
+	mode := sys.UnFilemode(match(3))
 	//num_of_hardlink, _ := strconv.Atoi(match(4))
 	//owner := match(5)
 	//group := match(6)

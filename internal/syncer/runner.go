@@ -16,7 +16,7 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/find"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/rsync"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/system"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -83,7 +83,7 @@ func (r *Runner) locateFindBinary() string {
 }
 func (r *Runner) prepareDirectory() (string, string, string, error) {
 	if r.Sandboxed {
-		if err := system.Sandbox(r.Common.SandboxMountOption); err != nil {
+		if err := sys.Sandbox(r.Common.SandboxMountOption); err != nil {
 			return "", "", "", fmt.Errorf("failed to sanxbox a process: %w", err)
 		}
 	}
@@ -121,12 +121,12 @@ func (r *Runner) prepareDirectory() (string, string, string, error) {
 		Options: r.Common.DestinationMountOptions,
 	}
 
-	if err = system.Mount(srcMountInfo.Source(), srcMountPath, srcMountInfo.Type(), srcMountInfo.RefinedOptions()); err != nil {
+	if err = sys.Mount(srcMountInfo.Source(), srcMountPath, srcMountInfo.Type(), srcMountInfo.RefinedOptions()); err != nil {
 		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", dstMountInfo, srcMountPath, err)
 	}
 	util.InfoLog.Printf("source mount success!(%s %s)", srcMountInfo, srcMountPath)
 
-	if err = system.Mount(dstMountInfo.Source(), dstMountPath, dstMountInfo.Type(), dstMountInfo.RefinedOptions()); err != nil {
+	if err = sys.Mount(dstMountInfo.Source(), dstMountPath, dstMountInfo.Type(), dstMountInfo.RefinedOptions()); err != nil {
 		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", dstMountInfo, dstMountPath, err)
 	}
 	util.InfoLog.Printf("destination mount success!(%s %s)", dstMountInfo, dstMountPath)
@@ -166,7 +166,7 @@ func (r *Runner) cleanupDirectory(tempPath string) {
 	}
 
 	for _, path := range umountPaths {
-		if err := system.Umount(path); err != nil {
+		if err := sys.Umount(path); err != nil {
 			util.ErrLog.Printf("failed to unmount %s: %s", path, err)
 		}
 	}

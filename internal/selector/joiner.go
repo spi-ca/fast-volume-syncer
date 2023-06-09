@@ -2,6 +2,7 @@ package selector
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"go.uber.org/multierr"
@@ -67,5 +68,7 @@ func (c *workerJoiner) submit(ctx context.Context, entry copyEntry, errorChan ch
 	}()
 	if err := c.invoker.Run(ctx, entry); err != nil {
 		errorChan <- err
+	} else {
+		util.SendSlackMessage(fmt.Sprintf("복사항목 복사 완료 %s", entry))
 	}
 }

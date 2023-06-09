@@ -15,7 +15,7 @@ import (
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/system"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -79,7 +79,7 @@ func (i *Invoker) execute(ctx context.Context, srcPath, srcSubpath, dstPath, dst
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
 	if !i.SandboxDisabled {
-		if err := system.IsolateMountNamespaceFlags(invoke.SysProcAttr); err != nil {
+		if err := sys.IsolateMountNamespaceFlags(invoke.SysProcAttr); err != nil {
 			return fmt.Errorf("failed to sanxbox a process: %w", err)
 		}
 	}

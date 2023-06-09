@@ -6,8 +6,9 @@ import (
 	"strconv"
 	"testing"
 
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
+
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/system"
 )
 
 func TestScanner_testRegex(t1 *testing.T) {
@@ -39,7 +40,7 @@ func TestScanner_testRegex(t1 *testing.T) {
 
 		inode, _ := strconv.Atoi(match(1))
 		size, _ := strconv.Atoi(match(2))
-		mode := util.UnFilemodeStr(match(3))
+		mode := sys.UnFilemodeStr(match(3))
 		num_of_hardlink, _ := strconv.Atoi(match(4))
 		owner := match(5)
 		group := match(6)
