@@ -40,6 +40,7 @@ func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string
 	envs = append(envs, "RSYNC_WHOLE_FILE", strconv.FormatBool(i.Args.WholeFile))
 	envs = append(envs, "RSYNC_INPLACE", strconv.FormatBool(i.Args.Inplace))
 	envs = append(envs, "RSYNC_RECURSIVE", strconv.FormatBool(i.Args.Recursive))
+	envs = append(envs, "RSYNC_BANDWIDTH_LIMIT", i.Args.BandwidthLimit)
 
 	envs = append(envs, "SRC_STORAGE_MOUNT_HOST", i.SourceMountHost)
 	envs = append(envs, "SRC_STORAGE_MOUNT_OPTION", i.SourceMountOptions)

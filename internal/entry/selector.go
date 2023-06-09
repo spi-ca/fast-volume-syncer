@@ -47,6 +47,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 	util.InfoLog.Print("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
 	util.InfoLog.Print("	rsync.inplace=", viper.GetBool("rsync.inplace"))
 	util.InfoLog.Print("	rsync.recursive=", viper.GetBool("rsync.recursive"))
+	util.InfoLog.Print("	rsync.bandwidth.limit=", viper.GetBool("rsync.bandwidth.limit"))
 	util.InfoLog.Print("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
 	util.InfoLog.Print("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
 	util.InfoLog.Print("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
@@ -99,6 +100,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 					WholeFile:          viper.GetBool("rsync.whole.file"),
 					Inplace:            viper.GetBool("rsync.inplace"),
 					Recursive:          viper.GetBool("rsync.recursive"),
+					BandwidthLimit:     viper.GetString("rsync.bandwidth.limit"),
 				},
 				SourceMountHost:    viper.GetString("src.storage.mount.host"),
 				SourceMountOptions: viper.GetString("src.storage.mount.option"),
