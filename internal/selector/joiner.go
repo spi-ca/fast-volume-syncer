@@ -30,18 +30,18 @@ func (c *workerJoiner) Execute(ctx context.Context, entryRecvChan <-chan copyEnt
 func (c *workerJoiner) dispatch(ctx context.Context, entryRecvChan <-chan copyEntry, errorChan chan<- error) {
 	sem := semaphore.NewWeighted(int64(c.workerSize))
 	defer func() {
+		_ = sem.Acquire(context.Background(), int64(c.workerSize))
+		close(errorChan)
 		if err := recover(); err != nil {
 			util.ErrLog.Printf("panic on workerJoiner: %v", err)
 		}
-		_ = sem.Acquire(context.Background(), int64(c.workerSize))
-		close(errorChan)
 	}()
 
 	workerCloser := func() {
+		sem.Release(1)
 		if err := recover(); err != nil {
 			util.ErrLog.Printf("panic on worker: %v", err)
 		}
-		sem.Release(1)
 	}
 
 	for {
@@ -69,6 +69,6 @@ func (c *workerJoiner) submit(ctx context.Context, closer func(), entry copyEntr
 	if err != nil {
 		errorChan <- err
 	} else {
-		util.SendSlackMessage(fmt.Sprintf("복사항목 복사 완료 %s, 소요시간 %s", entry, ended.Sub(started)))
+		util.SendSlackMessage(fmt.Sprintf("copyEntry(%s) completed in %s", entry, ended.Sub(started)))
 	}
 }

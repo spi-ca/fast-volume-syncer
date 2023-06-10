@@ -3,6 +3,7 @@ package selector
 import (
 	"context"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -40,20 +41,19 @@ func (r *Runner) Execute(ctx context.Context) error {
 		invoker:    &r.Template,
 	}
 
-	err := joiner.Execute(ctx, entryChan)
-	if err == nil && ctx.Err() == nil {
-		util.InfoLog.Print("복사 목록 로드 완료")
-	}
-	return err
+	return joiner.Execute(ctx, entryChan)
 }
 
 func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryChan chan<- copyEntry) {
 	defer close(entryChan)
 
 	const entryNum = 15
-	i := 0
+	readItems := 0
 	defer func() {
-		util.InfoLog.Printf("read %d items", i)
+		util.InfoLog.Printf("read %d items", readItems)
+		if err := recover(); err != nil {
+			util.SendSlackMessage(fmt.Sprintf("panic on Runner.loadCopyEntryCSV : %v", err))
+		}
 	}()
 
 	// csv reader 생성
@@ -118,7 +118,8 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 		case <-ctx.Done():
 			return
 		case entryChan <- entry:
-			i++
+			readItems++
 		}
 	}
+
 }

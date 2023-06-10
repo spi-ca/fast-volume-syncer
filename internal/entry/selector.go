@@ -82,7 +82,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 		if slackMonitoring {
 			util.SlackSender.Start()
 			defer util.SlackSender.Close()
-			util.SendSlackMessage(fmt.Sprintf("노드 %d 실행", nodeSelector))
+			util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d(daemonized:%s) had been initiated", daemonized, nodeSelector))
 		}
 	}
 
@@ -129,9 +129,12 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 		},
 	}
 	started := time.Now()
-	if err := runner.Execute(ctx); err != nil {
-		util.SendSlackMessage(err.Error())
-	}
+	err := runner.Execute(ctx)
 	ended := time.Now()
-	util.SendSlackMessage(fmt.Sprintf("completed: in %s", ended.Sub(started)))
+
+	if err != nil {
+		util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d ended with error(s) in %s. errors: %v", nodeSelector, ended.Sub(started), err))
+	} else {
+		util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d processed all copy entries in %s.", nodeSelector, ended.Sub(started)))
+	}
 }

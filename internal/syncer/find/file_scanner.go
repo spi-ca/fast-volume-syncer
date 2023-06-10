@@ -15,7 +15,7 @@ type Scanner struct {
 func (s *Scanner) Scan(ctx context.Context, root string, entryChan chan<- returns.Fileinfo) {
 	defer func() {
 		if err := recover(); err != nil {
-			util.SendSlackMessage(fmt.Sprintf("panic on Scanner.executeFind : %v", err))
+			util.SendSlackMessage(fmt.Sprintf("panic on Scanner.Scan : %v", err))
 		}
 	}()
 
