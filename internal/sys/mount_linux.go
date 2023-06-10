@@ -5,10 +5,8 @@ package sys
 
 import (
 	"fmt"
-	"os"
-	"syscall"
-
 	"github.com/moby/sys/mount"
+	"os"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
@@ -69,9 +67,4 @@ func Umount(destinationPath string) error {
 
 func RecursiveUmounts(destinationPath string) error {
 	return mount.RecursiveUnmount(destinationPath)
-}
-
-func IsolateMountNamespaceFlags(attr *syscall.SysProcAttr) error {
-	attr.Unshareflags |= syscall.CLONE_NEWNS | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_FS
-	return nil
 }

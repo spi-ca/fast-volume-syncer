@@ -41,6 +41,12 @@ var (
 				}
 			},
 		}),
+		retry: args.RetryArgs{
+			Attempts:  100,
+			Delay:     5 * time.Second,
+			MaxDelay:  1 * time.Minute,
+			MaxJitter: 15 * time.Second,
+		},
 		webhookUrl: slackWebhookUrl,
 	}
 )
@@ -98,6 +104,7 @@ func (s *slackSender) senderLoop(msgChan <-chan string) {
 	senderFunc := func() (any, error) {
 		return nil, slack.PostWebhook(s.webhookUrl, &msgContainer)
 	}
+
 	retryFunc := func() error {
 		_, err := s.circuitBreaker.Execute(senderFunc)
 		if err == nil {
@@ -111,6 +118,7 @@ func (s *slackSender) senderLoop(msgChan <-chan string) {
 		}
 		return err
 	}
+
 	for msg := range msgChan {
 		msgContainer.Text = fmt.Sprintf("[%s]%s:%s", s.hostname, InfoLog.Prefix(), msg)
 		if err := retry.Do(retryFunc, retryArgs...); err != nil {

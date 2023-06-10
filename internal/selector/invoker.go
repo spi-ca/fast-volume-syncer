@@ -7,10 +7,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 	"unicode"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
@@ -25,15 +25,19 @@ type Invoker struct {
 	Common args.SyncerCommonArguments
 }
 
-func (i *Invoker) Run(ctx context.Context, srcPath, srcSubpath, dstPath, dstSubpath string) error {
-	invoke := exec.CommandContext(ctx, sys.Executable(), "sync", srcPath, srcSubpath, dstPath, dstSubpath)
+func (i *Invoker) Run(parentContext context.Context, entry copyEntry) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	invoke := exec.CommandContext(ctx, sys.Executable(), "sync", entry.SourceVolume, entry.SourcePath, entry.DestinationVolume, entry.DestinationPath)
 	invoke.Env = i.assembleEnvironment(os.Environ())
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
-	if !i.SandboxDisabled {
-		if err := sys.IsolateMountNamespaceFlags(invoke.SysProcAttr); err != nil {
-			return fmt.Errorf("failed to sanxbox a process: %w", err)
-		}
+	if err := sys.ApplySysProc(invoke.SysProcAttr, !i.SandboxDisabled, true, false, syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to set SysProcAttr: %w", err)
 	}
 
 	stdout, _ := invoke.StdoutPipe()
@@ -42,7 +46,7 @@ func (i *Invoker) Run(ctx context.Context, srcPath, srcSubpath, dstPath, dstSubp
 	if err := invoke.Start(); err != nil {
 		return fmt.Errorf("failed to start process(rsync): %w", err)
 	}
-	started := time.Now()
+
 	res := &returns.ExecutionResult{PID: invoke.Process.Pid}
 
 	stdoutClosed := make(chan struct{})
@@ -56,17 +60,14 @@ func (i *Invoker) Run(ctx context.Context, srcPath, srcSubpath, dstPath, dstSubp
 		<-stderrClosed
 	case <-stderrClosed:
 		<-stdoutClosed
+	case <-parentContext.Done():
+		_ = syscall.Kill(res.PID, syscall.SIGTERM)
+		<-stdoutClosed
+		<-stderrClosed
 	}
-
 	res.Err = invoke.Wait()
-	elapsed := time.Now().Sub(started)
 
-	if err := res.HandleError(); err != nil {
-		return fmt.Errorf("selector(%d): %w", res.PID, err)
-	} else {
-		util.InfoLog.Printf("selector(%d) ended in %2.2f ms", res.PID, float32(elapsed.Microseconds())/1000)
-		return nil
-	}
+	return res.HandleError()
 }
 
 func (i *Invoker) assembleEnvironment(inherited []string) []string {

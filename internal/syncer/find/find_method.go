@@ -11,7 +11,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
+	"syscall"
 	"time"
 	"unicode"
 
@@ -119,7 +121,13 @@ func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reade
 	}
 }
 
-func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) error {
+func (s *Scanner) executeFind(parentContext context.Context, root string, rowChan chan<- returns.Fileinfo) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	invoke := exec.CommandContext(
 		ctx,
 		s.FinderBinaryPath,
@@ -129,6 +137,12 @@ func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- r
 
 	invoke.Env = os.Environ()
 	invoke.Stdin = nil
+	invoke.SysProcAttr = &syscall.SysProcAttr{}
+
+	if err := sys.ApplySysProc(invoke.SysProcAttr, false, false, false, syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+	}
+
 	stdout, _ := invoke.StdoutPipe()
 	stderr, _ := invoke.StderrPipe()
 
@@ -151,6 +165,10 @@ func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- r
 		<-stderrClosed
 	case <-stderrClosed:
 		<-stdoutClosed
+	case <-parentContext.Done():
+		_ = syscall.Kill(res.PID, syscall.SIGTERM)
+		<-stdoutClosed
+		<-stderrClosed
 	}
 
 	res.Err = invoke.Wait()

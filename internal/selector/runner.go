@@ -34,13 +34,13 @@ func (r *Runner) Execute(ctx context.Context) error {
 	entryChan := make(chan copyEntry, r.WorkerSize)
 
 	go r.loadCopyEntryCSV(ctx, f, entryChan)
+
 	joiner := &workerJoiner{
-		sem:           make(chan bool, r.WorkerSize),
-		entryRecvChan: entryChan,
-		invoker:       &r.Template,
+		sem:     make(chan bool, r.WorkerSize),
+		invoker: &r.Template,
 	}
 
-	err := joiner.Execute(ctx)
+	err := joiner.Execute(ctx, entryChan)
 	if err == nil && ctx.Err() == nil {
 		util.InfoLog.Print("복사 목록 로드 완료")
 	}
@@ -49,39 +49,27 @@ func (r *Runner) Execute(ctx context.Context) error {
 
 func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryChan chan<- copyEntry) {
 	defer close(entryChan)
-	const entryNum = 12
 
-	continueToRead := func(err error) bool {
-		if err == nil {
-			return true
-		} else if err == io.EOF {
-			err = nil
-			return false
-		} else {
-			util.ErrLog.Printf("read csv failed: %v", err)
-			return false
-		}
-	}
-
+	const entryNum = 15
 	i := 0
 	defer func() {
 		util.InfoLog.Printf("read %d items", i)
 	}()
+
 	// csv reader 생성
 	rdr := csv.NewReader(reader)
 	// csv 내용 모두 읽기
 	for {
 		row, err := rdr.Read()
-		if !continueToRead(err) {
+		if err == io.EOF {
+			err = nil
 			break
-		}
-		if len(row) < entryNum {
+		} else if err != nil {
+			util.ErrLog.Printf("read csv failed: %v", err)
+			break
+		} else if len(row) < entryNum {
 			continue
-		} else if len(row) > entryNum {
-			row = row[:entryNum]
-		}
-
-		if len(row[0]) < 1 {
+		} else if len(row[0]) < 1 {
 			continue
 		} else if firstChar := row[0][0]; firstChar < '0' || firstChar > '9' {
 			continue
@@ -101,13 +89,14 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 		entry.DestinationVolume = strings.TrimSpace(row[2])
 		entry.SourcePath = strings.TrimSpace(row[3])
 		entry.DestinationPath = strings.TrimSpace(row[4])
-		entry.ProjectId, err = strconv.Atoi(row[5])
+		entry.SourceProjectId, err = strconv.Atoi(row[5])
 		if err != nil {
 			util.ErrLog.Printf("project_id field parse  failed: %v", err)
 			continue
 		}
 
-		entry.ProjectName = strings.TrimSpace(row[6])
+		entry.SourceProjectName = strings.TrimSpace(row[6])
+
 		entry.UsedSize, err = strconv.ParseInt(row[7], 10, 64)
 		if err != nil {
 			util.ErrLog.Printf("project_id field parse  failed: %v", err)
@@ -122,6 +111,9 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 			continue
 		}
 		entry.VolumeSizeHuman = strings.TrimSpace(row[11])
+		entry.DestinationProjectName = strings.TrimSpace(row[12])
+		entry.VolumeName = strings.TrimSpace(row[13])
+		entry.SourceVolumeKey = strings.TrimSpace(row[14])
 		select {
 		case <-ctx.Done():
 			return

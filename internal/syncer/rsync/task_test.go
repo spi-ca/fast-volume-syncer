@@ -75,6 +75,7 @@ func TestRsyncArgs_assembleArgs(t *testing.T) {
 		WholeFile:          true,
 		Inplace:            false,
 		Recursive:          true,
+		BandwidthLimit:     "20m",
 	}
 	log.Print("format arguments", args.Assemble("src", "dst"))
 }

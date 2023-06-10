@@ -16,6 +16,7 @@ import (
 )
 
 type Daemonizer struct {
+	SlackMonitoring bool
 	NodeSelector    int
 	CopyInfoCSVPath string
 	LogFilePath     string
@@ -30,6 +31,7 @@ func (i *Daemonizer) assembleEnvironment(inherited []string) []string {
 	inherited = i.Common.AssembleEnvironment(inherited)
 	envs := make([]string, 0, 1)
 	envs = append(envs, "_FVS_DAEMONEZED", strconv.FormatBool(true))
+	envs = append(envs, "_SLACK_MONITORING", strconv.FormatBool(i.SlackMonitoring))
 	envs = append(envs, "_PID_FILEPATH", i.PidFilePath)
 	envs = append(envs, "WORKER_SIZE", strconv.Itoa(i.WorkerSize))
 	envs = append(envs, "SANDBOX_DISABLED", strconv.FormatBool(i.SandboxDisabled))
@@ -78,14 +80,16 @@ func (i *Daemonizer) Execute() error {
 		_ = logFile.Close()
 	}()
 
-	invoke := exec.Command("nohup", sys.Executable(), "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath)
+	invoke := exec.Command(sys.Executable(), "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath)
 	invoke.Stdin = nil
 	invoke.Stdout = logFile
 	invoke.Stderr = logFile
-	invoke.SysProcAttr = &syscall.SysProcAttr{
-		Setsid: true,
-	}
 	invoke.Env = i.assembleEnvironment(os.Environ())
+	invoke.SysProcAttr = &syscall.SysProcAttr{}
+
+	if err := sys.ApplySysProc(invoke.SysProcAttr, false, false, true, 0); err != nil {
+		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+	}
 
 	if err = invoke.Start(); err != nil {
 		return fmt.Errorf("failed to start process(selector): %w", err)

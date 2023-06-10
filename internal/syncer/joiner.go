@@ -12,20 +12,16 @@ import (
 )
 
 type chunkJoiner struct {
-	wg  sync.WaitGroup
-	sem chan bool
-
-	entryRecvChan <-chan returns.Fileinfo
-
-	chunkPool sync.Pool
+	taskSize  int
+	chunkSize int
 
 	invoker      *rsync.Task
 	scanDuration time.Duration
 }
 
-func (c *chunkJoiner) Execute(ctx context.Context) error {
-	errorChan := make(chan error, len(c.sem))
-	go c.dispatch(ctx, errorChan)
+func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.Fileinfo) error {
+	errorChan := make(chan error, c.taskSize)
+	go c.dispatch(ctx, entryRecvChan, errorChan)
 
 	var errs []error
 	for err := range errorChan {
@@ -34,37 +30,48 @@ func (c *chunkJoiner) Execute(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-func (c *chunkJoiner) dispatch(parentCtx context.Context, errorChan chan<- error) {
-	ended := false
+func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns.Fileinfo, errorChan chan<- error) {
+	sem := make(chan bool, c.taskSize)
+	wg := sync.WaitGroup{}
 	deadline := time.NewTicker(c.scanDuration)
-	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		if err := recover(); err != nil {
 			util.ErrLog.Printf("panic on chunkJoiner: %v", err)
 		}
-		c.wg.Wait()
+		wg.Wait()
 		close(errorChan)
-		cancel()
 		deadline.Stop()
 	}()
 
+	chunkPool := sync.Pool{
+		New: func() any {
+			return make([]returns.Fileinfo, 0, c.chunkSize)
+		},
+	}
+
+	taskCloser := func(chunk []returns.Fileinfo) {
+		<-sem
+		wg.Done()
+		chunkPool.Put(chunk[0:0])
+	}
+
 	var chunk []returns.Fileinfo
-	for !ended {
+	for ended := false; !ended; {
 		select {
-		case <-parentCtx.Done():
+		case <-ctx.Done():
 			// 종료시 남은 항목은 무시한다.
 			ended = true
 			if chunk != nil {
-				c.chunkPool.Put(chunk[0:0])
+				chunkPool.Put(chunk[0:0])
 			}
 			continue
-		case entry, ok := <-c.entryRecvChan:
+		case entry, ok := <-entryRecvChan:
 			if !ok {
 				ended = true
 				break
 			}
 			if chunk == nil {
-				chunk = c.chunkPool.Get().([]returns.Fileinfo)[0:0]
+				chunk = chunkPool.Get().([]returns.Fileinfo)[0:0]
 			}
 			chunk = append(chunk, entry)
 			if len(chunk) < cap(chunk) {
@@ -79,23 +86,16 @@ func (c *chunkJoiner) dispatch(parentCtx context.Context, errorChan chan<- error
 		}
 
 		if len(chunk) > 0 {
-			c.wg.Add(1)
-			c.sem <- true
-			go c.submit(ctx, chunk, errorChan)
+			wg.Add(1)
+			sem <- true
+			go c.submit(ctx, taskCloser, chunk, errorChan)
 			chunk = nil
-		}
-		if ended {
-			break
 		}
 	}
 }
 
-func (c *chunkJoiner) submit(ctx context.Context, chunk []returns.Fileinfo, errorChan chan<- error) {
-	defer func() {
-		<-c.sem
-		c.wg.Done()
-		c.chunkPool.Put(chunk[0:0])
-	}()
+func (c *chunkJoiner) submit(ctx context.Context, closer func([]returns.Fileinfo), chunk []returns.Fileinfo, errorChan chan<- error) {
+	defer closer(chunk)
 	err := c.invoker.Execute(ctx, chunk)
 	if err != nil {
 		errorChan <- err

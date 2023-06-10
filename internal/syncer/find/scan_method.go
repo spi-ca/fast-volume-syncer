@@ -11,6 +11,7 @@ import (
 )
 
 func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) error {
+	defer close(rowChan)
 	var errs []error
 	iter := func(path string, d os.DirEntry, err error) error {
 		if err != nil {
