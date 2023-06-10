@@ -29,6 +29,7 @@ var (
 )
 
 func init() {
+	flags.Bool("monitoring-disabled", false, "(daemon only)without slack monitoring")
 	flags.String("log-file", fmt.Sprintf("log/%s.log", name), "(daemon only)specify a log file")
 	flags.String("pid-file", fmt.Sprintf("%s.pid", name), "(daemon only)specify a pid file")
 	flags.Bool("sandbox-disabled", false, "(selector only)without namespace isolation")
@@ -43,6 +44,7 @@ func init() {
 	flags.Bool("rsync-whole-file", false, "disable delta xfer of rsync")
 	flags.Bool("rsync-inplace", false, "write file directly info destination path")
 	flags.Bool("rsync-recursive", false, "disable chunk xfer")
+	flags.String("rsync-bandwidth-limit", "", "specify bandwidth limitation")
 	flags.String("src-storage-mount-host", "192.0.2.10", "source storage host")
 	flags.String("src-storage-mount-option", "ro,nodiratime,noatime,vers=3,rsize=524288,wsize=524288,hard,nolock,proto=tcp,timeo=600,retrans=2,sec=sys", "source mount option")
 	flags.String("src-storage-mount-name", "src", "source mountpoint name. e.g. /tmp/rand_path/*src*")
@@ -129,22 +131,41 @@ func main() {
 		}
 		entry.Selector(sandboxSupported, nodeSelector, copyInfoFilePath)
 	case "start":
-		entry.DaemonStart()
+		var (
+			nodeSelector     = defaultNodeSelector
+			copyInfoFilePath = defaultCSVFilename
+		)
+		switch flags.NArg() {
+		case consumedArgs:
+			consumedArgs += 0
+		case consumedArgs + 1:
+			if rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0)); err == nil {
+				nodeSelector = rawNodeSelector
+			} else {
+				fmt.Println("failed to parse nodeSelector:%w", err)
+				usage()
+			}
+			consumedArgs += 1
+		case consumedArgs + 2:
+			if rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0)); err == nil {
+				nodeSelector = rawNodeSelector
+			} else {
+				fmt.Println("failed to parse nodeSelector:%w", err)
+				usage()
+			}
+			copyInfoFilePath = flags.Arg(consumedArgs + 1)
+			consumedArgs += 2
+		default:
+			fmt.Println("required arguments missing")
+			usage()
+		}
+		entry.DaemonStart(sandboxSupported, nodeSelector, copyInfoFilePath)
 	case "stop":
+		entry.DaemonStop()
 	default:
 		fmt.Printf("invalid action %s\n", action)
 		usage()
 	}
-	switch argAction {
-	case "sync":
-	case "select":
-	case "start":
-	case "stop":
-		entry.DaemonStop()
-	default:
-		usage()
-	}
-
 }
 
 func usage() {

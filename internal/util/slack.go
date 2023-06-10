@@ -42,7 +42,7 @@ var (
 			},
 		}),
 		retry: args.RetryArgs{
-			Attempts:  3,
+			Attempts:  100,
 			Delay:     5 * time.Second,
 			MaxDelay:  1 * time.Minute,
 			MaxJitter: 15 * time.Second,
@@ -67,7 +67,11 @@ func (s *slackSender) Send(message string) {
 	if s.messageChan == nil {
 		return
 	}
-	s.messageChan <- message
+	select {
+	case s.messageChan <- message:
+	default:
+		ErrLog.Printf("cannot send a message(%s): too many messages in queue(%d)", message, len(s.messageChan))
+	}
 }
 
 func (s *slackSender) Start() {
@@ -98,33 +102,26 @@ func (s *slackSender) senderLoop(msgChan <-chan string) {
 	retryArgs := s.retry.Assemble(nil)
 
 	senderFunc := func() (any, error) {
-		err := slack.PostWebhook(s.webhookUrl, &msgContainer)
+		return nil, slack.PostWebhook(s.webhookUrl, &msgContainer)
+	}
+
+	retryFunc := func() error {
+		_, err := s.circuitBreaker.Execute(senderFunc)
 		if err == nil {
-			return nil, nil
+			return nil
 		} else if retryable, ok := err.(slackutilsx.Retryable); !ok || !retryable.Retryable() {
-			return nil, retry.Unrecoverable(err)
+			return retry.Unrecoverable(err)
 		}
+
 		if rateLimitedErr, ok := err.(*slack.RateLimitedError); ok {
 			<-time.After(rateLimitedErr.RetryAfter)
 		}
-		return nil, err
-	}
-
-	processFunc := func() error {
-		_, err := s.circuitBreaker.Execute(senderFunc)
 		return err
-	}
-
-	if s.retry.Attempts > 0 {
-		retryFunc := processFunc
-		processFunc = func() error {
-			return retry.Do(retryFunc, retryArgs...)
-		}
 	}
 
 	for msg := range msgChan {
 		msgContainer.Text = fmt.Sprintf("[%s]%s:%s", s.hostname, InfoLog.Prefix(), msg)
-		if err := processFunc(); err != nil {
+		if err := retry.Do(retryFunc, retryArgs...); err != nil {
 			ErrLog.Printf("failed to send message: %v", err)
 		}
 	}

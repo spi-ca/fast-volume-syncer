@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	selfExecutablePath, _ = os.Executable()
+	selfExecutablePath string
 )
 
 func init() {

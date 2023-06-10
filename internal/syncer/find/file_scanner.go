@@ -2,6 +2,7 @@ package find
 
 import (
 	"context"
+	"fmt"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
@@ -9,20 +10,26 @@ import (
 
 type Scanner struct {
 	FinderBinaryPath string
-
-	TaskSize  int
-	ChunkSize int
 }
 
-func (s *Scanner) Scan(ctx context.Context, root string) <-chan returns.Fileinfo {
-	util.InfoLog.Printf("chunk size is %d", s.ChunkSize)
-	entryChan := make(chan returns.Fileinfo, s.TaskSize*s.ChunkSize)
+func (s *Scanner) Scan(ctx context.Context, root string, entryChan chan<- returns.Fileinfo) {
+	defer func() {
+		if err := recover(); err != nil {
+			util.SendSlackMessage(fmt.Sprintf("panic on Scanner.executeFind : %v", err))
+		}
+	}()
+
+	var scanner func(context.Context, string, chan<- returns.Fileinfo) error
 	if len(s.FinderBinaryPath) > 0 {
 		util.InfoLog.Printf("directory scan using finder")
-		go s.executeFind(ctx, root, entryChan)
+		scanner = s.executeFind
 	} else {
 		util.InfoLog.Printf("directory scan using filepath.WalkDir")
-		go s.scanDirectory(ctx, root, entryChan)
+		scanner = s.scanDirectory
 	}
-	return entryChan
+
+	err := scanner(ctx, root, entryChan)
+	if err != nil {
+		util.SendSlackMessage(fmt.Sprintf("Scanning failed : %v", err))
+	}
 }

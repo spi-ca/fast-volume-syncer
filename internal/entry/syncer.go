@@ -58,6 +58,7 @@ func Syncer(
 	util.InfoLog.Print("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
 	util.InfoLog.Print("	rsync.inplace=", viper.GetBool("rsync.inplace"))
 	util.InfoLog.Print("	rsync.recursive=", viper.GetBool("rsync.recursive"))
+	util.InfoLog.Print("	rsync.bandwidth.limit=", viper.GetBool("rsync.bandwidth.limit"))
 	util.InfoLog.Print("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
 	util.InfoLog.Print("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
 	util.InfoLog.Print("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
@@ -73,7 +74,6 @@ func Syncer(
 	util.InfoLog.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
 	util.InfoLog.Print("	retry.max.jitter=", viper.GetDuration("retry.max.jitter"))
 	util.InfoLog.Print("	daemonized=", daemonized)
-	util.InfoLog.Print("	selectorInvoked=", selectorInvoked)
 	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
 	util.InfoLog.Print("	sandboxed=", sandboxed)
 	util.InfoLog.Print("	argSrcStoragePath=", srcStoragePath)
@@ -83,6 +83,7 @@ func Syncer(
 	util.InfoLog.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
 	util.InfoLog.Print("	env['_SYNCER_INVOKED']=", os.Getenv("_SYNCER_INVOKED"))
 	util.InfoLog.Print("	env['_SYNCER_SANDBOXED']=", os.Getenv("_SYNCER_SANDBOXED"))
+	util.InfoLog.Print("	env['_SLACK_MONITORING']=", os.Getenv("_SLACK_MONITORING"))
 	util.InfoLog.Print("---")
 	//return
 
@@ -99,6 +100,7 @@ func Syncer(
 				WholeFile:          viper.GetBool("rsync.whole.file"),
 				Inplace:            viper.GetBool("rsync.inplace"),
 				Recursive:          viper.GetBool("rsync.recursive"),
+				BandwidthLimit:     viper.GetString("rsync.bandwidth.limit"),
 			},
 
 			SourceMountHost:         viper.GetString("src.storage.mount.host"),

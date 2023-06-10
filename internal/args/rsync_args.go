@@ -1,5 +1,7 @@
 package args
 
+import "fmt"
+
 type RsyncArgs struct {
 	Verbose            bool
 	PreservePermission bool
@@ -9,6 +11,7 @@ type RsyncArgs struct {
 	WholeFile          bool
 	Inplace            bool
 	Recursive          bool
+	BandwidthLimit     string
 }
 
 func (a *RsyncArgs) Assemble(src, dst string) []string {
@@ -85,6 +88,10 @@ func (a *RsyncArgs) Assemble(src, dst string) []string {
 	} else {
 		args = append(args, "--no-recursive")
 		args = append(args, "--files-from=-")
+	}
+
+	if len(a.BandwidthLimit) > 0 {
+		args = append(args, fmt.Sprint("--bwlimit=", a.BandwidthLimit))
 	}
 
 	args = append(args, src)

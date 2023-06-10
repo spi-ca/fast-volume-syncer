@@ -12,7 +12,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
+	"syscall"
 	"time"
 	"unicode"
 
@@ -22,6 +24,7 @@ import (
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -40,10 +43,10 @@ func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
 	if t.Retry.Attempts <= 0 {
 		return t.execute(ctx, fileList)
 	}
-	return retry.Do(
-		func() error { return t.execute(ctx, fileList) },
-		t.Retry.Assemble(ctx)...,
-	)
+
+	retryOptionArgs := t.Retry.Assemble(ctx)
+	retryFunc := func() error { return t.execute(ctx, fileList) }
+	return retry.Do(retryFunc, retryOptionArgs...)
 }
 
 func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}, fileList []returns.Fileinfo) {
@@ -157,7 +160,6 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []retur
 			}
 		}
 	}
-
 }
 
 func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closeChan chan<- struct{}) {
@@ -171,7 +173,13 @@ func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closeChan chan<-
 	}
 }
 
-func (t *Task) execute(ctx context.Context, fileList []returns.Fileinfo) error {
+func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinfo) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	invoke := exec.CommandContext(
 		ctx,
 		"rsync",
@@ -179,6 +187,12 @@ func (t *Task) execute(ctx context.Context, fileList []returns.Fileinfo) error {
 	)
 
 	invoke.Env = os.Environ()
+	invoke.SysProcAttr = &syscall.SysProcAttr{}
+
+	if err := sys.ApplySysProc(invoke.SysProcAttr, false, false, false, syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+	}
+
 	stdin, _ := invoke.StdinPipe()
 	stdout, _ := invoke.StdoutPipe()
 	stderr, _ := invoke.StderrPipe()
@@ -204,6 +218,10 @@ func (t *Task) execute(ctx context.Context, fileList []returns.Fileinfo) error {
 		<-stderrClosed
 	case <-stderrClosed:
 		<-stdoutClosed
+	case <-parentContext.Done():
+		_ = syscall.Kill(res.pid, syscall.SIGTERM)
+		<-stdoutClosed
+		<-stderrClosed
 	}
 
 	res.err = invoke.Wait()

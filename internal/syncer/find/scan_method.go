@@ -2,35 +2,32 @@ package find
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
-func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) {
-	defer func() {
-		close(rowChan)
-		if err := recover(); err != nil {
-			util.SendSlackMessage(fmt.Sprintf("panic on Scanner.scanDirectory: %v", err))
-		}
-	}()
+func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) error {
+	defer close(rowChan)
+	var errs []error
 	iter := func(path string, d os.DirEntry, err error) error {
 		if err != nil {
+			errs = append(errs, err)
 			return filepath.SkipDir
 		}
 
 		info, err := d.Info()
 		if err != nil {
-			util.ErrLog.Printf("failed to get file info: %v", err)
+			errs = append(errs, fmt.Errorf("failed to get file info: %w", err))
 			return nil
 		}
 
 		relPath, err := filepath.Rel(root, path)
 		if err != nil {
-			util.ErrLog.Printf("failed to make relative file path info: %v", err)
+			errs = append(errs, fmt.Errorf("failed to make relative file path info: %w", err))
 			return filepath.SkipDir
 		}
 
@@ -49,7 +46,7 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 	}
 	err := filepath.WalkDir(root, iter)
 	if err != nil {
-		util.ErrLog.Printf("walkdir(%s) has returned err: %v", root, err)
-		util.SendSlackMessage(fmt.Sprintf("panic on Scanner.executeFind : %v", err))
+		errs = append(errs, fmt.Errorf("walkdir(%s) has returned err: %w", root, err))
 	}
+	return errors.Join(errs...)
 }
