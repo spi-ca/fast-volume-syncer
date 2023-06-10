@@ -11,7 +11,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
+	"syscall"
 	"time"
 	"unicode"
 
@@ -119,12 +121,12 @@ func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reade
 	}
 }
 
-func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) {
-	defer func() {
-		if err := recover(); err != nil {
-			util.SendSlackMessage(fmt.Sprintf("panic on Scanner.executeFind : %v", err))
-		}
-	}()
+func (s *Scanner) executeFind(parentContext context.Context, root string, rowChan chan<- returns.Fileinfo) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	invoke := exec.CommandContext(
 		ctx,
@@ -135,12 +137,17 @@ func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- r
 
 	invoke.Env = os.Environ()
 	invoke.Stdin = nil
+	invoke.SysProcAttr = &syscall.SysProcAttr{}
+
+	if err := sys.ApplySysProc(invoke.SysProcAttr, false, false, false, syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+	}
+
 	stdout, _ := invoke.StdoutPipe()
 	stderr, _ := invoke.StderrPipe()
 
 	if err := invoke.Start(); err != nil {
-		util.ErrLog.Printf("failed to start process(find): %v", err)
-		return
+		return fmt.Errorf("failed to start process(find): %w", err)
 	}
 	started := time.Now()
 	res := &returns.ExecutionResult{PID: invoke.Process.Pid}
@@ -158,14 +165,15 @@ func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- r
 		<-stderrClosed
 	case <-stderrClosed:
 		<-stdoutClosed
+	case <-parentContext.Done():
+		_ = syscall.Kill(res.PID, syscall.SIGTERM)
+		<-stdoutClosed
+		<-stderrClosed
 	}
 
 	res.Err = invoke.Wait()
 	ended := time.Now()
 
-	if err := res.HandleError(); err != nil {
-		util.ErrLog.Printf("find(%d) ended in %2.2f ms, %v", res.PID, float32(ended.Sub(started).Microseconds())/1000, err)
-	} else {
-		util.InfoLog.Printf("find(%d) ended in %2.2f ms", &res, float32(ended.Sub(started).Microseconds())/1000)
-	}
+	util.InfoLog.Printf("find(%d) ended in %2.2f ms", &res, float32(ended.Sub(started).Microseconds())/1000)
+	return res.HandleError()
 }

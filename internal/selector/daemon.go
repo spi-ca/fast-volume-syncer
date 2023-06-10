@@ -45,6 +45,7 @@ func (i *Daemonizer) assembleEnvironment(inherited []string) []string {
 	}
 	return inherited
 }
+
 func (i *Daemonizer) openFiles() (*os.File, *os.File, error) {
 
 	nullFile, err := os.Open(os.DevNull)
@@ -79,14 +80,16 @@ func (i *Daemonizer) Execute() error {
 		_ = logFile.Close()
 	}()
 
-	invoke := exec.Command("nohup", sys.Executable(), "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath)
+	invoke := exec.Command(sys.Executable(), "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath)
 	invoke.Stdin = nil
 	invoke.Stdout = logFile
 	invoke.Stderr = logFile
-	invoke.SysProcAttr = &syscall.SysProcAttr{
-		Setsid: true,
-	}
 	invoke.Env = i.assembleEnvironment(os.Environ())
+	invoke.SysProcAttr = &syscall.SysProcAttr{}
+
+	if err := sys.ApplySysProc(invoke.SysProcAttr, false, false, true, 0); err != nil {
+		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+	}
 
 	if err = invoke.Start(); err != nil {
 		return fmt.Errorf("failed to start process(selector): %w", err)

@@ -20,40 +20,58 @@ type Runner struct {
 	Template Invoker
 }
 
-func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryChan chan<- copyEntry) {
-	defer close(entryChan)
-	const entryNum = 12
-	// csv reader 생성
-
-	rdr := csv.NewReader(reader)
-	row, err := rdr.Read()
-	if err != nil {
-		util.ErrLog.Printf("readline failed: %v", err)
-		return
+func (r *Runner) Execute(ctx context.Context) error {
+	var f io.Reader
+	if r.CopyInfoCSVPath == "-" {
+		f = io.NopCloser(os.Stdout)
+	} else if rawFile, err := os.OpenFile(r.CopyInfoCSVPath, os.O_RDONLY, 0o666); err != nil {
+		return err
+	} else {
+		defer rawFile.Close()
+		f = rawFile
 	}
 
+	entryChan := make(chan copyEntry, r.WorkerSize)
+
+	go r.loadCopyEntryCSV(ctx, f, entryChan)
+
+	joiner := &workerJoiner{
+		sem:     make(chan bool, r.WorkerSize),
+		invoker: &r.Template,
+	}
+
+	err := joiner.Execute(ctx, entryChan)
+	if err == nil && ctx.Err() == nil {
+		util.InfoLog.Print("복사 목록 로드 완료")
+	}
+	return err
+}
+
+func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryChan chan<- copyEntry) {
+	defer close(entryChan)
+
+	const entryNum = 15
 	i := 0
 	defer func() {
 		util.InfoLog.Printf("read %d items", i)
 	}()
 
+	// csv reader 생성
+	rdr := csv.NewReader(reader)
 	// csv 내용 모두 읽기
-	for row, err = rdr.Read(); err == nil; row, err = rdr.Read() {
+	for {
+		row, err := rdr.Read()
 		if err == io.EOF {
 			err = nil
 			break
 		} else if err != nil {
 			util.ErrLog.Printf("read csv failed: %v", err)
-			return
-		}
-
-		if len(row) < entryNum {
+			break
+		} else if len(row) < entryNum {
 			continue
-		} else if len(row) > entryNum {
-			row = row[:entryNum]
-		}
-
-		if strings.HasPrefix(row[0], "#") {
+		} else if len(row[0]) < 1 {
+			continue
+		} else if firstChar := row[0][0]; firstChar < '0' || firstChar > '9' {
 			continue
 		}
 
@@ -71,7 +89,6 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 		entry.DestinationVolume = strings.TrimSpace(row[2])
 		entry.SourcePath = strings.TrimSpace(row[3])
 		entry.DestinationPath = strings.TrimSpace(row[4])
-
 		entry.SourceProjectId, err = strconv.Atoi(row[5])
 		if err != nil {
 			util.ErrLog.Printf("project_id field parse  failed: %v", err)
@@ -104,27 +121,4 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 			i++
 		}
 	}
-
-}
-
-func (r *Runner) Execute(ctx context.Context) error {
-	var f io.Reader
-	if r.CopyInfoCSVPath == "-" {
-		f = io.NopCloser(os.Stdout)
-	} else if rawFile, err := os.OpenFile(r.CopyInfoCSVPath, os.O_RDONLY, 0o666); err != nil {
-		return err
-	} else {
-		defer rawFile.Close()
-		f = rawFile
-	}
-
-	entryChan := make(chan copyEntry, r.WorkerSize)
-	go r.loadCopyEntryCSV(ctx, f, entryChan)
-	joiner := newWorkerJoiner(r.WorkerSize, &r.Template)
-
-	err := joiner.Execute(ctx, entryChan)
-	if err == nil && ctx.Err() == nil {
-		util.InfoLog.Print("복사 목록 로드 완료")
-	}
-	return err
 }
