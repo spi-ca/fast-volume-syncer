@@ -1,4 +1,4 @@
-package main
+package entry
 
 import (
 	"context"
@@ -16,7 +16,9 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
-func syncerEntry() {
+func Syncer(
+	sandboxSupported bool, srcStoragePath, srcStorageSubPath, dstStoragePath, dstStorageSubPath string,
+) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// 시그널 처리
@@ -74,10 +76,10 @@ func syncerEntry() {
 	util.InfoLog.Print("	selectorInvoked=", selectorInvoked)
 	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
 	util.InfoLog.Print("	sandboxed=", sandboxed)
-	util.InfoLog.Print("	argSrcStoragePath=", argSrcStoragePath)
-	util.InfoLog.Print("	argSrcStorageSubPath=", argSrcStorageSubPath)
-	util.InfoLog.Print("	argDstStoragePath=", argDstStoragePath)
-	util.InfoLog.Print("	argDstStorageSubPath=", argDstStorageSubPath)
+	util.InfoLog.Print("	argSrcStoragePath=", srcStoragePath)
+	util.InfoLog.Print("	argSrcStorageSubPath=", srcStorageSubPath)
+	util.InfoLog.Print("	argDstStoragePath=", dstStoragePath)
+	util.InfoLog.Print("	argDstStorageSubPath=", dstStorageSubPath)
 	util.InfoLog.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
 	util.InfoLog.Print("	env['_SYNCER_INVOKED']=", os.Getenv("_SYNCER_INVOKED"))
 	util.InfoLog.Print("	env['_SYNCER_SANDBOXED']=", os.Getenv("_SYNCER_SANDBOXED"))
@@ -116,10 +118,10 @@ func syncerEntry() {
 				MaxJitter: viper.GetDuration("retry.max.jitter"),
 			},
 		},
-		SourceMountPath:         argSrcStoragePath,
-		SourceMountSubPath:      argSrcStorageSubPath,
-		DestinationMountPath:    argDstStoragePath,
-		DestinationMountSubPath: argDstStorageSubPath,
+		SourceMountPath:         srcStoragePath,
+		SourceMountSubPath:      srcStorageSubPath,
+		DestinationMountPath:    dstStoragePath,
+		DestinationMountSubPath: dstStorageSubPath,
 	}
 	started := time.Now()
 	if err := runner.Execute(ctx); err != nil {

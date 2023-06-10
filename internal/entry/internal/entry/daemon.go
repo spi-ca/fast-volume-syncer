@@ -1,4 +1,4 @@
-package main
+package entry
 
 import (
 	"os"
@@ -11,7 +11,7 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
-func daemonStopEntry() {
+func DaemonStop() {
 	pidFilePath := viper.GetString("pid.file")
 	pid, err := selector.ReadPidFile(pidFilePath)
 	if err != nil {
@@ -33,7 +33,7 @@ func daemonStopEntry() {
 	util.InfoLog.Printf("sending SIGTERM(%d)", pid)
 }
 
-func daemonStartEntry() {
+func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) {
 
 	util.InfoLog.Print("args:")
 	util.InfoLog.Print("	pid.file=", viper.GetString("pid.file"))
@@ -67,8 +67,8 @@ func daemonStartEntry() {
 	util.InfoLog.Print("---")
 
 	runner := selector.Daemonizer{
-		NodeSelector:    argNodeSelector,
-		CopyInfoCSVPath: argCopyInfoFilePath,
+		NodeSelector:    nodeSelector,
+		CopyInfoCSVPath: copyInfoFilePath,
 		PidFilePath:     viper.GetString("pid.file"),
 		LogFilePath:     viper.GetString("log.file"),
 		WorkerSize:      viper.GetInt("worker.size"),

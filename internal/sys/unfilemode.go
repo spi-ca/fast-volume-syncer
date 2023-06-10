@@ -1,6 +1,8 @@
 package sys
 
-import "io/fs"
+import (
+	"io/fs"
+)
 
 const (
 	s_ISUID = 0o4000

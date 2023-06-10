@@ -1,4 +1,4 @@
-package main
+package entry
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
-func selectorEntry() {
+func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// 시그널 처리
@@ -81,8 +81,8 @@ func selectorEntry() {
 	}
 
 	runner := selector.Runner{
-		NodeSelector:    argNodeSelector,
-		CopyInfoCSVPath: argCopyInfoFilePath,
+		NodeSelector:    nodeSelector,
+		CopyInfoCSVPath: copyInfoFilePath,
 
 		WorkerSize: viper.GetInt("worker.size"),
 

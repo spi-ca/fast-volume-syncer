@@ -2,10 +2,9 @@ package syncer
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
-
-	"go.uber.org/multierr"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/rsync"
@@ -46,11 +45,11 @@ func newChunkJoiner(
 func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.Fileinfo) error {
 	go c.dispatchChunks(ctx, entryRecvChan)
 
-	var err error
-	for newErr := range c.errorChan {
-		err = multierr.Append(err, newErr)
+	var errs []error
+	for err := range c.errorChan {
+		errs = append(errs, err)
 	}
-	return err
+	return errors.Join(errs...)
 }
 
 func (c *chunkJoiner) dispatchChunks(parentCtx context.Context, entryRecvChan <-chan returns.Fileinfo) {

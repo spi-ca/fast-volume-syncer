@@ -6,9 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
-
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
 )
 
 func TestScanner_testRegex(t1 *testing.T) {

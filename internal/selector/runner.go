@@ -22,7 +22,7 @@ type Runner struct {
 
 func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryChan chan<- copyEntry) {
 	defer close(entryChan)
-	const entryNum = 15
+	const entryNum = 12
 	// csv reader 생성
 
 	rdr := csv.NewReader(reader)
@@ -49,7 +49,11 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 
 		if len(row) < entryNum {
 			continue
-		} else if strings.HasPrefix(row[0], "#") {
+		} else if len(row) > entryNum {
+			row = row[:entryNum]
+		}
+
+		if strings.HasPrefix(row[0], "#") {
 			continue
 		}
 
