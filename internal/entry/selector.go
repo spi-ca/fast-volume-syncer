@@ -41,6 +41,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 	util.InfoLog.Print("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
 	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
 	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
+	util.InfoLog.Print("	rsync.delete=", viper.GetBool("rsync.delete"))
 	util.InfoLog.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
 	util.InfoLog.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
 	util.InfoLog.Print("	rsync.special=", viper.GetBool("rsync.special"))
@@ -82,6 +83,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 		if slackMonitoring {
 			util.SlackSender.Start()
 			defer util.SlackSender.Close()
+			util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d(daemonized:%t) had been initiated", nodeSelector, daemonized))
 		}
 	}
 
@@ -97,6 +99,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 				SandboxMountOption: viper.GetString("sandbox.mount.option"),
 				Args: args.RsyncArgs{
 					Verbose:            viper.GetBool("rsync.verbose"),
+					Delete:             viper.GetBool("rsync.delete"),
 					PreservePermission: viper.GetBool("rsync.perms"),
 					PreserveOwnership:  viper.GetBool("rsync.owner"),
 					CopySpecial:        viper.GetBool("rsync.special"),
@@ -128,9 +131,12 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 		},
 	}
 	started := time.Now()
-	if err := runner.Execute(ctx); err != nil {
-		util.SendSlackMessage(err.Error())
-	}
+	err := runner.Execute(ctx)
 	ended := time.Now()
-	util.SendSlackMessage(fmt.Sprintf("completed: in %s", ended.Sub(started)))
+
+	if err != nil {
+		util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d ended with error(s) in %s. errors: %v", nodeSelector, ended.Sub(started), err))
+	} else {
+		util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d processed all copy entries in %s.", nodeSelector, ended.Sub(started)))
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -21,13 +22,13 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 
 		info, err := d.Info()
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to get file info: %w", err))
+			errs = append(errs, fmt.Errorf("failed to get file(%s) info: %w", path, err))
 			return nil
 		}
 
 		relPath, err := filepath.Rel(root, path)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to make relative file path info: %w", err))
+			errs = append(errs, fmt.Errorf("failed to make relative file path(%s) info: %w", path, err))
 			return filepath.SkipDir
 		}
 
@@ -36,7 +37,11 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 			Mode: info.Mode(),
 			Size: info.Size(),
 		}
-
+		if (info.Mode().Type() & fs.ModeSymlink) != 0 {
+			entry.SymlinkPath, err = os.Readlink(path)
+			errs = append(errs, fmt.Errorf("failed to execute readlink file(%s) info: %w", path, err))
+			return nil
+		}
 		select {
 		case rowChan <- entry:
 			return nil

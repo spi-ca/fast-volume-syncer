@@ -51,6 +51,7 @@ func Syncer(
 	util.InfoLog.Print("args:")
 	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
 	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
+	util.InfoLog.Print("	rsync.delete=", viper.GetBool("rsync.delete"))
 	util.InfoLog.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
 	util.InfoLog.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
 	util.InfoLog.Print("	rsync.special=", viper.GetBool("rsync.special"))
@@ -85,7 +86,12 @@ func Syncer(
 	util.InfoLog.Print("	env['_SYNCER_SANDBOXED']=", os.Getenv("_SYNCER_SANDBOXED"))
 	util.InfoLog.Print("	env['_SLACK_MONITORING']=", os.Getenv("_SLACK_MONITORING"))
 	util.InfoLog.Print("---")
-	//return
+
+	util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been initiated",
+		sandboxed,
+		viper.GetString("src.storage.mount.host"), srcStoragePath, srcStorageSubPath,
+		viper.GetString("dst.storage.mount.host"), dstStoragePath, dstStorageSubPath,
+	)
 
 	runner := syncer.Runner{
 		Sandboxed: selectorInvoked && sandboxed && sandboxSupported,
@@ -93,6 +99,7 @@ func Syncer(
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
 			Args: args.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),
+				Delete:             viper.GetBool("rsync.delete"),
 				PreservePermission: viper.GetBool("rsync.perms"),
 				PreserveOwnership:  viper.GetBool("rsync.owner"),
 				CopySpecial:        viper.GetBool("rsync.special"),
@@ -130,5 +137,11 @@ func Syncer(
 		util.ErrLog.Fatal(err)
 	}
 	ended := time.Now()
-	util.InfoLog.Printf("completed: in %s", ended.Sub(started))
+
+	util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been ended in %s",
+		sandboxed,
+		viper.GetString("src.storage.mount.host"), srcStoragePath, srcStorageSubPath,
+		viper.GetString("dst.storage.mount.host"), dstStoragePath, dstStorageSubPath,
+		ended.Sub(started),
+	)
 }

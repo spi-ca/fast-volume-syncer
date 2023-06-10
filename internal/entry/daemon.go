@@ -17,7 +17,7 @@ func DaemonStop() {
 	if err != nil {
 		util.ErrLog.Fatal(err)
 	} else if pid < 1 {
-		util.ErrLog.Fatalf("invalid pid(%d)")
+		util.ErrLog.Fatalf("invalid pid(%d)", pid)
 	}
 
 	proc, err := os.FindProcess(pid)
@@ -42,6 +42,7 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 	util.InfoLog.Print("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
 	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
 	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
+	util.InfoLog.Print("	rsync.delete=", viper.GetBool("rsync.delete"))
 	util.InfoLog.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
 	util.InfoLog.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
 	util.InfoLog.Print("	rsync.special=", viper.GetBool("rsync.special"))
@@ -80,6 +81,7 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
 			Args: args.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),
+				Delete:             viper.GetBool("rsync.delete"),
 				PreservePermission: viper.GetBool("rsync.perms"),
 				PreserveOwnership:  viper.GetBool("rsync.owner"),
 				CopySpecial:        viper.GetBool("rsync.special"),

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
@@ -129,9 +130,9 @@ func (r *Runner) prepareDirectory() (string, string, string, error) {
 			return "", "", "", fmt.Errorf("failed to sanxbox a process: %w", err)
 		}
 	}
-	// 아래 영역은 이제 host os 와 격리되었다.
 
-	tempDir, err := os.MkdirTemp("", "syncer-")
+	// 아래 영역은 이제 host os 와 격리되었다.
+	tempDir, err := os.MkdirTemp("", fmt.Sprintf("syncer-%x", int64(os.Getpid())^time.Now().Unix()))
 	if err != nil {
 		return "", "", "", fmt.Errorf("failed to make temp directory: %w", err)
 	}

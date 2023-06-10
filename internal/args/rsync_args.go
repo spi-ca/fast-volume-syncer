@@ -4,6 +4,7 @@ import "fmt"
 
 type RsyncArgs struct {
 	Verbose            bool
+	Delete             bool
 	PreservePermission bool
 	PreserveOwnership  bool
 	CopySpecial        bool
@@ -17,9 +18,9 @@ type RsyncArgs struct {
 func (a *RsyncArgs) Assemble(src, dst string) []string {
 	args := []string{
 		"--links",
-		"--hard-links",
-		"--copy-dirlinks",
+		"--safe-links",
 		"--times",
+		"--one-file-system",
 		"--omit-dir-times",
 		"--omit-link-times",
 		"--human-readable",
@@ -36,6 +37,11 @@ func (a *RsyncArgs) Assemble(src, dst string) []string {
 	} else {
 		args = append(args, "--info=NAME2")
 
+	}
+
+	if a.Delete {
+		args = append(args, "--delete")
+		args = append(args, "--delete-during")
 	}
 
 	if a.PreservePermission {
@@ -76,7 +82,7 @@ func (a *RsyncArgs) Assemble(src, dst string) []string {
 		args = append(args, "--no-whole-file")
 	}
 
-	if a.WholeFile {
+	if a.Inplace {
 		args = append(args, "--inplace")
 
 	} else {

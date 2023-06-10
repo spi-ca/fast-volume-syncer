@@ -70,15 +70,20 @@ func (s *Scanner) parseFindEntry(line []byte) (*returns.Fileinfo, error) {
 			}
 		}
 		src := symlinkPathMatch(1)
-		//dst := symlinkPathMatch(2)
-		path = src
+		dst := symlinkPathMatch(2)
+		return &returns.Fileinfo{
+			Path:        string(src),
+			SymlinkPath: string(dst),
+			Mode:        mode,
+			Size:        size,
+		}, nil
+	} else {
+		return &returns.Fileinfo{
+			Path: string(path),
+			Mode: mode,
+			Size: size,
+		}, nil
 	}
-
-	return &returns.Fileinfo{
-		Path: string(path),
-		Mode: mode,
-		Size: size,
-	}, nil
 }
 
 func (s *Scanner) handleFindStderr(res *returns.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
@@ -106,7 +111,7 @@ func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reade
 		}
 		entry, err := s.parseFindEntry(line)
 		if err != nil {
-			util.ErrLog.Printf("[%d]failed to parse find line: %s, %v", res.PID, line, err)
+			util.ErrLog.Printf("[%d]failed to parse find line: %s, %v", res.PID, string(line), err)
 			continue
 		}
 
