@@ -14,7 +14,7 @@ type ExecutionResult struct {
 	Err error
 
 	stderrLastLogLineStartIdx int
-	stderrLastLogLines        [5]string
+	stderrLastLogLines        [10]string
 }
 
 func (r *ExecutionResult) AppendLogLine(line string) {
