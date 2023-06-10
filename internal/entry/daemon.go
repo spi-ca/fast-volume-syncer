@@ -17,7 +17,7 @@ func DaemonStop() {
 	if err != nil {
 		util.ErrLog.Fatal(err)
 	} else if pid < 1 {
-		util.ErrLog.Fatalf("invalid pid(%d)")
+		util.ErrLog.Fatalf("invalid pid(%d)", pid)
 	}
 
 	proc, err := os.FindProcess(pid)

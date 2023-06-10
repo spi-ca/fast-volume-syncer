@@ -106,7 +106,7 @@ func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reade
 		}
 		entry, err := s.parseFindEntry(line)
 		if err != nil {
-			util.ErrLog.Printf("[%d]failed to parse find line: %s, %v", res.PID, line, err)
+			util.ErrLog.Printf("[%d]failed to parse find line: %s, %v", res.PID, string(line), err)
 			continue
 		}
 

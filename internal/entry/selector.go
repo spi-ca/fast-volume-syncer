@@ -82,7 +82,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 		if slackMonitoring {
 			util.SlackSender.Start()
 			defer util.SlackSender.Close()
-			util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d(daemonized:%s) had been initiated", daemonized, nodeSelector))
+			util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d(daemonized:%t) had been initiated", nodeSelector, daemonized))
 		}
 	}
 

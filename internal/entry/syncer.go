@@ -86,7 +86,7 @@ func Syncer(
 	util.InfoLog.Print("	env['_SLACK_MONITORING']=", os.Getenv("_SLACK_MONITORING"))
 	util.InfoLog.Print("---")
 
-	util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%s,%s:%s,%s -> %s:%s,%s) had been initiated",
+	util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been initiated",
 		sandboxed,
 		viper.GetString("src.storage.mount.host"), srcStoragePath, srcStorageSubPath,
 		viper.GetString("dst.storage.mount.host"), dstStoragePath, dstStorageSubPath,
@@ -136,7 +136,7 @@ func Syncer(
 	}
 	ended := time.Now()
 
-	util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%s,%s:%s,%s -> %s:%s,%s) had been ended in %s",
+	util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been ended in %s",
 		sandboxed,
 		viper.GetString("src.storage.mount.host"), srcStoragePath, srcStorageSubPath,
 		viper.GetString("dst.storage.mount.host"), dstStoragePath, dstStorageSubPath,
