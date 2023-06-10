@@ -2,7 +2,6 @@ package find
 
 import (
 	"context"
-	"fmt"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
@@ -15,7 +14,7 @@ type Scanner struct {
 func (s *Scanner) Scan(ctx context.Context, root string, entryChan chan<- returns.Fileinfo) {
 	defer func() {
 		if err := recover(); err != nil {
-			util.SendSlackMessage(fmt.Sprintf("panic on Scanner.Scan : %v", err))
+			util.ErrLog.Printf("panic on Scanner.Scan : %v", err)
 		}
 	}()
 
@@ -30,6 +29,6 @@ func (s *Scanner) Scan(ctx context.Context, root string, entryChan chan<- return
 
 	err := scanner(ctx, root, entryChan)
 	if err != nil {
-		util.SendSlackMessage(fmt.Sprintf("Scanning failed : %v", err))
+		util.ErrLog.Printf("Scanning failed : %v", err)
 	}
 }

@@ -68,6 +68,7 @@ func TestRsyncTask_Regex(t *testing.T) {
 func TestRsyncArgs_assembleArgs(t *testing.T) {
 	args := args.RsyncArgs{
 		Verbose:            false,
+		Delete:             false,
 		PreservePermission: false,
 		PreserveOwnership:  false,
 		CopySpecial:        false,

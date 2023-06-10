@@ -27,6 +27,7 @@ func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.
 
 	var errs []error
 	for err := range errorChan {
+		util.ErrLog.Printf("chunk processing failed : %v", err)
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)

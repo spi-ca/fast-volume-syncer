@@ -34,7 +34,7 @@ var (
 		12:  {false, true, "Error in rsync protocol data stream"},
 		13:  {false, false, "Errors with program diagnostics"},
 		14:  {false, true, "Error in IPC code"},
-		20:  {false, false, "Received SIGUSR1 or SIGINT"}, // successful failure
+		20:  {false, false, "Received SIGUSR1 or SIGINT"},
 		21:  {false, false, "Some error returned by waitpid()"},
 		22:  {false, true, "Error allocating core memory buffers"},
 		23:  {false, false, "Partial transfer due to error"},

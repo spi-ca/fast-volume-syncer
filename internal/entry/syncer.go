@@ -51,6 +51,7 @@ func Syncer(
 	util.InfoLog.Print("args:")
 	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
 	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
+	util.InfoLog.Print("	rsync.delete=", viper.GetBool("rsync.delete"))
 	util.InfoLog.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
 	util.InfoLog.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
 	util.InfoLog.Print("	rsync.special=", viper.GetBool("rsync.special"))
@@ -98,6 +99,7 @@ func Syncer(
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
 			Args: args.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),
+				Delete:             viper.GetBool("rsync.delete"),
 				PreservePermission: viper.GetBool("rsync.perms"),
 				PreserveOwnership:  viper.GetBool("rsync.owner"),
 				CopySpecial:        viper.GetBool("rsync.special"),

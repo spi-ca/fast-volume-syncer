@@ -33,6 +33,7 @@ func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string
 	envs = append(envs, "SANDBOX_MOUNT_OPTION", i.SandboxMountOption)
 
 	envs = append(envs, "RSYNC_VERBOSE", strconv.FormatBool(i.Args.Verbose))
+	envs = append(envs, "RSYNC_DELETE", strconv.FormatBool(i.Args.Delete))
 	envs = append(envs, "RSYNC_PERMS", strconv.FormatBool(i.Args.PreservePermission))
 	envs = append(envs, "RSYNC_OWNER", strconv.FormatBool(i.Args.PreserveOwnership))
 	envs = append(envs, "RSYNC_SPECIAL", strconv.FormatBool(i.Args.CopySpecial))
