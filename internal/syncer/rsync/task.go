@@ -70,7 +70,7 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 			if err := os.MkdirAll(dirPath, dirMode); err != nil {
 				util.ErrLog.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
 			}
-		} else if mode&fs.ModeSymlink != 0 {
+		} else if mode.Type()&fs.ModeSymlink != 0 {
 			linkPath := filepath.Join(t.DestinationPath, entry.Path)
 			if err := os.RemoveAll(linkPath); err != nil {
 				util.ErrLog.Printf("failed to cleanup directory %s :%v", linkPath, err)

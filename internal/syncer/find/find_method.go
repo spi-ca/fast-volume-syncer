@@ -54,7 +54,7 @@ func (s *Scanner) parseFindEntry(line []byte) (*returns.Fileinfo, error) {
 	//date := match(8)
 	path := match(9)
 
-	if mode&fs.ModeSymlink != 0 {
+	if mode.Type()&fs.ModeSymlink != 0 {
 		symlinkedMatched := symlinkFormat.FindSubmatchIndex(path)
 		if groups := len(symlinkedMatched) / 2; groups < 1 {
 			return nil, fmt.Errorf("scan: invalid symlink path %s", path)
