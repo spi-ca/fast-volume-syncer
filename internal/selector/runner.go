@@ -36,8 +36,8 @@ func (r *Runner) Execute(ctx context.Context) error {
 	go r.loadCopyEntryCSV(ctx, f, entryChan)
 
 	joiner := &workerJoiner{
-		sem:     make(chan bool, r.WorkerSize),
-		invoker: &r.Template,
+		workerSize: r.WorkerSize,
+		invoker:    &r.Template,
 	}
 
 	err := joiner.Execute(ctx, entryChan)

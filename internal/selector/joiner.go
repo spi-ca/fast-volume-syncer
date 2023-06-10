@@ -4,21 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
+
+	"golang.org/x/sync/semaphore"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type workerJoiner struct {
-	wg  sync.WaitGroup
-	sem chan bool
-
-	invoker *Invoker
+	workerSize int
+	invoker    *Invoker
 }
 
 func (c *workerJoiner) Execute(ctx context.Context, entryRecvChan <-chan copyEntry) error {
-	errorChan := make(chan error, len(c.sem))
+	errorChan := make(chan error, c.workerSize)
 	go c.dispatch(ctx, entryRecvChan, errorChan)
 
 	var errs []error
@@ -29,15 +28,21 @@ func (c *workerJoiner) Execute(ctx context.Context, entryRecvChan <-chan copyEnt
 }
 
 func (c *workerJoiner) dispatch(ctx context.Context, entryRecvChan <-chan copyEntry, errorChan chan<- error) {
-	//ctx, cancel := context.WithCancel(context.Background())
+	sem := semaphore.NewWeighted(int64(c.workerSize))
 	defer func() {
 		if err := recover(); err != nil {
 			util.ErrLog.Printf("panic on workerJoiner: %v", err)
 		}
-		//cancel()
-		c.wg.Wait()
+		_ = sem.Acquire(context.Background(), int64(c.workerSize))
 		close(errorChan)
 	}()
+
+	workerCloser := func() {
+		if err := recover(); err != nil {
+			util.ErrLog.Printf("panic on worker: %v", err)
+		}
+		sem.Release(1)
+	}
 
 	for {
 		select {
@@ -48,18 +53,14 @@ func (c *workerJoiner) dispatch(ctx context.Context, entryRecvChan <-chan copyEn
 			if !ok {
 				return
 			}
-			c.wg.Add(1)
-			c.sem <- true
-			go c.submit(ctx, entry, errorChan)
+			_ = sem.Acquire(ctx, 1)
+			go c.submit(ctx, workerCloser, entry, errorChan)
 		}
 	}
 }
 
-func (c *workerJoiner) submit(ctx context.Context, entry copyEntry, errorChan chan<- error) {
-	defer func() {
-		<-c.sem
-		c.wg.Done()
-	}()
+func (c *workerJoiner) submit(ctx context.Context, closer func(), entry copyEntry, errorChan chan<- error) {
+	defer closer()
 
 	started := time.Now()
 	err := c.invoker.Run(ctx, entry)

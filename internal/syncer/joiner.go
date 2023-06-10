@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/semaphore"
+
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/rsync"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
@@ -31,14 +33,13 @@ func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.
 }
 
 func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns.Fileinfo, errorChan chan<- error) {
-	sem := make(chan bool, c.taskSize)
-	wg := sync.WaitGroup{}
+	sem := semaphore.NewWeighted(int64(c.taskSize))
 	deadline := time.NewTicker(c.scanDuration)
 	defer func() {
 		if err := recover(); err != nil {
 			util.ErrLog.Printf("panic on chunkJoiner: %v", err)
 		}
-		wg.Wait()
+		_ = sem.Acquire(context.Background(), int64(c.taskSize))
 		close(errorChan)
 		deadline.Stop()
 	}()
@@ -50,8 +51,10 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 	}
 
 	taskCloser := func(chunk []returns.Fileinfo) {
-		<-sem
-		wg.Done()
+		if err := recover(); err != nil {
+			util.ErrLog.Printf("panic on chunkHandler: %v", err)
+		}
+		sem.Release(1)
 		chunkPool.Put(chunk[0:0])
 	}
 
@@ -86,8 +89,7 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 		}
 
 		if len(chunk) > 0 {
-			wg.Add(1)
-			sem <- true
+			_ = sem.Acquire(ctx, 1)
 			go c.submit(ctx, taskCloser, chunk, errorChan)
 			chunk = nil
 		}
