@@ -46,39 +46,30 @@ func (i *Daemonizer) assembleEnvironment(inherited []string) []string {
 	return inherited
 }
 
-func (i *Daemonizer) openFiles() (*os.File, *os.File, error) {
-
-	nullFile, err := os.Open(os.DevNull)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open null file: %w", err)
-	}
+func (i *Daemonizer) openLogFile() (*os.File, error) {
 	logFileDir := filepath.Dir(i.LogFilePath)
-	err = os.MkdirAll(logFileDir, 0o755)
+	err := os.MkdirAll(logFileDir, 0o755)
 	if err != nil {
-		_ = nullFile.Close()
-		return nil, nil, fmt.Errorf("failed to make logdir(%s): %w", logFileDir, err)
+		return nil, fmt.Errorf("failed to make logdir(%s): %w", logFileDir, err)
 	}
+
 	logFile, err := os.OpenFile(i.LogFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
-		_ = nullFile.Close()
-		return nil, nil, fmt.Errorf("failed to open log file: %w", err)
+		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
-	return logFile, nullFile, nil
+	return logFile, nil
 }
 
 func (i *Daemonizer) Execute() error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	logFile, nullFile, err := i.openFiles()
+	logFile, err := i.openLogFile()
 	if err != nil {
 		return err
 	}
 
-	defer func() {
-		_ = nullFile.Close()
-		_ = logFile.Close()
-	}()
+	defer logFile.Close()
 
 	invoke := exec.Command(sys.Executable(), "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath)
 	invoke.Stdin = nil
@@ -87,11 +78,13 @@ func (i *Daemonizer) Execute() error {
 	invoke.Env = i.assembleEnvironment(os.Environ())
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
-	if err := sys.ApplySysProc(invoke.SysProcAttr, false, false, true, 0); err != nil {
+	err = sys.ApplySysProc(invoke.SysProcAttr, false, false, true, 0)
+	if err != nil {
 		return fmt.Errorf("failed to set SysProcAttr: %w", err)
 	}
 
-	if err = invoke.Start(); err != nil {
+	err = invoke.Start()
+	if err != nil {
 		return fmt.Errorf("failed to start process(selector): %w", err)
 	}
 

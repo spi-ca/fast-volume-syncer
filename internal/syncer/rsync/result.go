@@ -49,7 +49,7 @@ var (
 
 type result struct {
 	startIdx      int
-	lastFilenames [5]string
+	lastFilenames [10]string
 	total         int
 	sent          int
 	processing    int
@@ -60,7 +60,7 @@ type result struct {
 	started       time.Time
 
 	stderrLastLogLineStartIdx int
-	stderrLastLogLines        [5]string
+	stderrLastLogLines        [10]string
 }
 
 func (r *result) appendLogLine(line string) {
