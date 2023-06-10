@@ -18,8 +18,8 @@ type RsyncArgs struct {
 func (a *RsyncArgs) Assemble(src, dst string) []string {
 	args := []string{
 		"--links",
+		"--safe-links",
 		"--times",
-		"--copy-unsafe-links",
 		"--one-file-system",
 		"--omit-dir-times",
 		"--omit-link-times",
@@ -82,7 +82,7 @@ func (a *RsyncArgs) Assemble(src, dst string) []string {
 		args = append(args, "--no-whole-file")
 	}
 
-	if a.WholeFile {
+	if a.Inplace {
 		args = append(args, "--inplace")
 
 	} else {
