@@ -70,7 +70,14 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 			if err := os.MkdirAll(dirPath, dirMode); err != nil {
 				util.ErrLog.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
 			}
-		} else if mode.IsRegular() || (mode&fs.ModeSymlink != 0) {
+		} else if mode&fs.ModeSymlink != 0 {
+			linkPath := filepath.Join(t.DestinationPath, entry.Path)
+			if err := os.RemoveAll(linkPath); err != nil {
+				util.ErrLog.Printf("failed to cleanup directory %s :%v", linkPath, err)
+			} else if err = os.Symlink(entry.SymlinkPath, linkPath); err != nil {
+				util.ErrLog.Printf("failed to symlink %s -> %s :%v", linkPath, entry.SymlinkPath, err)
+			}
+		} else if mode.IsRegular() {
 			if addSep {
 				_ = w.WriteByte('\n')
 			} else {
@@ -79,6 +86,8 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 
 			_, _ = w.WriteString(entry.Path)
 			_ = w.Flush()
+		} else {
+			util.ErrLog.Printf("skip filepath %s,unexpected filemode(%s)", entry.Path, entry.Mode)
 		}
 	}
 
