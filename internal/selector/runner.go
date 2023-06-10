@@ -79,7 +79,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 		if err != nil {
 			util.ErrLog.Printf("node field parse  failed: %v", err)
 			continue
-		} else if r.NodeSelector > 0 && r.NodeSelector != nodeNum {
+		} else if r.NodeSelector >= 0 && r.NodeSelector != nodeNum {
 			continue
 		}
 
