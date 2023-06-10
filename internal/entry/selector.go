@@ -82,6 +82,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 		if slackMonitoring {
 			util.SlackSender.Start()
 			defer util.SlackSender.Close()
+			util.SendSlackMessage(fmt.Sprintf("노드 %d 실행", nodeSelector))
 		}
 	}
 

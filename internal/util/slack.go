@@ -26,7 +26,7 @@ var (
 			Name:        "slack",
 			MaxRequests: 100,
 			Interval:    500 * time.Millisecond,
-			Timeout:     3 * time.Second,
+			Timeout:     30 * time.Second,
 			ReadyToTrip: func(counts gobreaker.Counts) bool {
 				failureRatio := counts.TotalFailures
 				failureRatio *= 100
@@ -42,7 +42,7 @@ var (
 			},
 		}),
 		retry: args.RetryArgs{
-			Attempts:  100,
+			Attempts:  15,
 			Delay:     5 * time.Second,
 			MaxDelay:  1 * time.Minute,
 			MaxJitter: 15 * time.Second,
@@ -67,11 +67,7 @@ func (s *slackSender) Send(message string) {
 	if s.messageChan == nil {
 		return
 	}
-	select {
-	case s.messageChan <- message:
-	default:
-		ErrLog.Printf("cannot send a message(%s): too many messages in queue(%d)", message, len(s.messageChan))
-	}
+	s.messageChan <- message
 }
 
 func (s *slackSender) Start() {
