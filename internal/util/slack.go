@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ import (
 
 const (
 	slackWebhookUrl = "https://example.invalid/webhook"
+	loggerPrefix    = "[slack]"
+	maxMessageLen   = 40000
 )
 
 var (
@@ -35,9 +38,9 @@ var (
 			},
 			OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
 				if from == gobreaker.StateClosed && to == gobreaker.StateOpen {
-					ErrLog.Print("endpoint unavailable")
+					ErrLog.Printf("%sendpoint unavailable", loggerPrefix)
 				} else if from == gobreaker.StateHalfOpen && to == gobreaker.StateClosed {
-					ErrLog.Print("endpoint is returning available")
+					ErrLog.Printf("%sendpoint is returning available", loggerPrefix)
 				}
 			},
 		}),
@@ -55,6 +58,7 @@ type slackSender struct {
 	circuitBreaker *gobreaker.CircuitBreaker
 	hostname       string
 	webhookUrl     string
+	doneChan       <-chan struct{}
 	messageChan    chan<- string
 	retry          args.RetryArgs
 	m              sync.RWMutex
@@ -73,30 +77,57 @@ func (s *slackSender) Send(message string) {
 func (s *slackSender) Start() {
 	s.m.Lock()
 	defer s.m.Unlock()
+	if s.doneChan != nil {
+		return
+	}
+
 	hostname, _ := os.Hostname()
 	messageChan := make(chan string, 100)
+	doneChan := make(chan struct{})
 	s.hostname = hostname
-	go s.senderLoop(messageChan)
+	go s.senderLoop(messageChan, doneChan)
 	s.messageChan = messageChan
+	s.doneChan = doneChan
 }
 
 func (s *slackSender) Close() {
 	if s.messageChan == nil {
 		return
 	}
-	close(s.messageChan)
 	s.m.Lock()
 	defer s.m.Unlock()
+	close(s.messageChan)
+	<-s.doneChan
 	s.messageChan = nil
+	s.doneChan = nil
 }
 
-func (s *slackSender) senderLoop(msgChan <-chan string) {
+func (s *slackSender) Write(b []byte) (int, error) {
+	if len(b) < 1 {
+		return 0, nil
+	}
 	s.m.RLock()
 	defer s.m.RUnlock()
 
+	if s.messageChan != nil {
+		s.messageChan <- string(b)
+	}
+	return len(b), nil
+}
+
+func (s *slackSender) senderLoop(msgChan <-chan string, doneChan chan<- struct{}) {
+	deadline := time.NewTicker(5 * time.Second)
+	defer func() {
+		if err := recover(); err != nil {
+			ErrLog.Printf("%spanic on slackSender.senderLoop: %v", loggerPrefix, err)
+		}
+		deadline.Stop()
+		close(doneChan)
+	}()
+
+	prefix := fmt.Sprintf("[%s]", s.hostname)
 	msgContainer := slack.WebhookMessage{}
 	retryArgs := s.retry.Assemble(nil)
-
 	senderFunc := func() (any, error) {
 		return nil, slack.PostWebhook(s.webhookUrl, &msgContainer)
 	}
@@ -114,15 +145,47 @@ func (s *slackSender) senderLoop(msgChan <-chan string) {
 		}
 		return err
 	}
+	var remainMessage = ""
+	var builder = strings.Builder{}
+	for ended := false; !ended; {
+		select {
+		case entry, ok := <-msgChan:
+			if !ok {
+				ended = true
+				break
+			} else if strings.HasPrefix(entry, loggerPrefix) {
+				continue
+			} else if builder.Len() > maxMessageLen {
+				remainMessage = entry
+				break
+			}
+			if builder.Len() > 0 {
+				builder.WriteByte('\n')
+			}
+			builder.WriteString(prefix)
+			builder.WriteString(entry)
+			continue
+		case <-deadline.C:
+			break
+		}
 
-	for msg := range msgChan {
-		msgContainer.Text = fmt.Sprintf("[%s]%s:%s", s.hostname, InfoLog.Prefix(), msg)
-		if err := retry.Do(retryFunc, retryArgs...); err != nil {
-			ErrLog.Printf("failed to send message: %v", err)
+		if builder.Len() > 0 {
+			msgContainer.Text = builder.String()
+			if err := retry.Do(retryFunc, retryArgs...); err != nil {
+				ErrLog.Printf("%sfailed to send message: %v", loggerPrefix, err)
+			}
+			builder.Reset()
+		}
+
+		if len(remainMessage) > 0 {
+			builder.WriteString(prefix)
+			builder.WriteString(remainMessage)
+			msgContainer.Text = builder.String()
+			if err := retry.Do(retryFunc, retryArgs...); err != nil {
+				ErrLog.Printf("%sfailed to send message: %v", loggerPrefix, err)
+			}
+			remainMessage = ""
+			builder.Reset()
 		}
 	}
-}
-
-func SendSlackMessage(message string) {
-	SlackSender.Send(message)
 }

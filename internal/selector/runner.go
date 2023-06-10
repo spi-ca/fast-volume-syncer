@@ -3,7 +3,6 @@ package selector
 import (
 	"context"
 	"encoding/csv"
-	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -52,7 +51,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 	defer func() {
 		util.InfoLog.Printf("read %d items", readItems)
 		if err := recover(); err != nil {
-			util.SendSlackMessage(fmt.Sprintf("panic on Runner.loadCopyEntryCSV : %v", err))
+			util.ErrLog.Printf("panic on Runner.loadCopyEntryCSV : %v", err)
 		}
 	}()
 

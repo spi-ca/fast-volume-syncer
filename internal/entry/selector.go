@@ -3,6 +3,7 @@ package entry
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -82,8 +83,13 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 		}
 		if slackMonitoring {
 			util.SlackSender.Start()
-			defer util.SlackSender.Close()
-			util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d(daemonized:%t) had been initiated", nodeSelector, daemonized))
+			prevWriter := util.ErrLog.Writer()
+			defer func() {
+				util.ErrLog.SetOutput(prevWriter)
+				util.SlackSender.Close()
+			}()
+			util.ErrLog.SetOutput(io.MultiWriter(prevWriter, util.SlackSender))
+			util.ErrLog.Printf(fmt.Sprintf("fast-volume-sync/selector@%d(daemonized:%t) had been initiated", nodeSelector, daemonized))
 		}
 	}
 
@@ -135,8 +141,8 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 	ended := time.Now()
 
 	if err != nil {
-		util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d ended with error(s) in %s. errors: %v", nodeSelector, ended.Sub(started), err))
+		util.ErrLog.Printf("fast-volume-sync/selector@%d ended with error(s) in %s. errors: %v", nodeSelector, ended.Sub(started), err)
 	} else {
-		util.SendSlackMessage(fmt.Sprintf("fast-volume-sync/selector@%d processed all copy entries in %s.", nodeSelector, ended.Sub(started)))
+		util.ErrLog.Printf("fast-volume-sync/selector@%d processed all copy entries in %s.", nodeSelector, ended.Sub(started))
 	}
 }

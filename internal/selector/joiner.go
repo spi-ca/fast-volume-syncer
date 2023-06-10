@@ -3,7 +3,6 @@ package selector
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -69,6 +68,6 @@ func (c *workerJoiner) submit(ctx context.Context, closer func(), entry copyEntr
 	if err != nil {
 		errorChan <- err
 	} else {
-		util.SendSlackMessage(fmt.Sprintf("copyEntry(%s) completed in %s", entry, ended.Sub(started)))
+		util.ErrLog.Printf("copyEntry(%s) completed in %s", entry, ended.Sub(started))
 	}
 }
