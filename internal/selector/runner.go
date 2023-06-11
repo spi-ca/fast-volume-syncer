@@ -76,7 +76,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 
 		nodeNum, err := strconv.Atoi(row[0])
 		if err != nil {
-			util.ErrLog.Printf("node field parse  failed: %v", err)
+			util.ErrLog.Printf("node field parse failed: %v", err)
 			continue
 		} else if r.NodeSelector >= 0 && r.NodeSelector != nodeNum {
 			continue
@@ -90,7 +90,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 		entry.DestinationPath = strings.TrimSpace(row[4])
 		entry.SourceProjectId, err = strconv.Atoi(row[5])
 		if err != nil {
-			util.ErrLog.Printf("project_id field parse  failed: %v", err)
+			util.ErrLog.Printf("source_project_id field parse  failed: %v", err)
 			continue
 		}
 
@@ -98,7 +98,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 
 		entry.UsedSize, err = strconv.ParseInt(row[7], 10, 64)
 		if err != nil {
-			util.ErrLog.Printf("project_id field parse  failed: %v", err)
+			util.ErrLog.Printf("used_size field parse  failed: %v", err)
 			continue
 		}
 
@@ -106,7 +106,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 		entry.VolumeType = strings.TrimSpace(row[9])
 		entry.VolumeSize, err = strconv.ParseInt(row[10], 10, 64)
 		if err != nil {
-			util.ErrLog.Printf("project_id field parse  failed: %v", err)
+			util.ErrLog.Printf("volume_size field parse  failed: %v", err)
 			continue
 		}
 		entry.VolumeSizeHuman = strings.TrimSpace(row[11])
