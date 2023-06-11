@@ -2,6 +2,7 @@ package find
 
 import (
 	"context"
+	"fmt"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
@@ -9,13 +10,22 @@ import (
 
 type Scanner struct {
 	FinderBinaryPath string
+	EntryChannelSize int
 }
 
-func (s *Scanner) Scan(ctx context.Context, root string, entryChan chan<- returns.Fileinfo) {
+func (s *Scanner) Scan(ctx context.Context, root string) (<-chan returns.Fileinfo, <-chan error) {
+	entryChan := make(chan returns.Fileinfo, s.EntryChannelSize)
+	errorChan := make(chan error, 1)
+	go s.execute(ctx, root, entryChan, errorChan)
+	return entryChan, errorChan
+}
+
+func (s *Scanner) execute(ctx context.Context, root string, entryChan chan<- returns.Fileinfo, errorChan chan<- error) {
 	defer func() {
 		if err := recover(); err != nil {
 			util.ErrLog.Printf("panic on Scanner.Scan : %v", err)
 		}
+		close(errorChan)
 	}()
 
 	var scanner func(context.Context, string, chan<- returns.Fileinfo) error
@@ -29,6 +39,6 @@ func (s *Scanner) Scan(ctx context.Context, root string, entryChan chan<- return
 
 	err := scanner(ctx, root, entryChan)
 	if err != nil {
-		util.ErrLog.Printf("Scanning failed : %v", err)
+		errorChan <- fmt.Errorf("scanning failed : %w", err)
 	}
 }

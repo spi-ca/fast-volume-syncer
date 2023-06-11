@@ -2,7 +2,7 @@ package syncer
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -17,20 +17,14 @@ type chunkJoiner struct {
 	taskSize  int
 	chunkSize int
 
-	invoker      *rsync.Task
+	invoker      rsync.Task
 	scanDuration time.Duration
 }
 
-func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.Fileinfo) error {
+func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.Fileinfo) <-chan error {
 	errorChan := make(chan error, c.taskSize)
 	go c.dispatch(ctx, entryRecvChan, errorChan)
-
-	var errs []error
-	for err := range errorChan {
-		util.ErrLog.Printf("chunk processing failed : %v", err)
-		errs = append(errs, err)
-	}
-	return errors.Join(errs...)
+	return errorChan
 }
 
 func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns.Fileinfo, errorChan chan<- error) {
@@ -101,6 +95,6 @@ func (c *chunkJoiner) submit(ctx context.Context, closer func([]returns.Fileinfo
 	defer closer(chunk)
 	err := c.invoker.Execute(ctx, chunk)
 	if err != nil {
-		errorChan <- err
+		errorChan <- fmt.Errorf("chunk processing failed : %w", err)
 	}
 }

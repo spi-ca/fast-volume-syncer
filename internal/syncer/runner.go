@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -52,15 +54,15 @@ func (r *Runner) Execute(ctx context.Context) error {
 	r.logVolumeInfo(ctx, dstPath)
 
 	util.InfoLog.Print("=> split rsync")
-
-	entryChan := make(chan returns.Fileinfo, r.Common.TaskSize*r.Common.ChunkSize)
 	util.InfoLog.Printf("chunk size is %d", r.Common.ChunkSize)
 
-	scanner := find.Scanner{FinderBinaryPath: finderBinaryPath}
-	go scanner.Scan(ctx, srcPath, entryChan)
+	scanner := find.Scanner{
+		FinderBinaryPath: finderBinaryPath,
+		EntryChannelSize: r.Common.TaskSize * r.Common.ChunkSize,
+	}
 
-	joiner := &chunkJoiner{
-		invoker: &rsync.Task{
+	joiner := chunkJoiner{
+		invoker: rsync.Task{
 			Arguments:       r.Common.Args.Assemble(srcPath, dstPath),
 			Retry:           r.Common.Retry,
 			SourcePath:      srcPath,
@@ -71,14 +73,44 @@ func (r *Runner) Execute(ctx context.Context) error {
 		scanDuration: r.Common.ScanDuration,
 	}
 
-	err = joiner.Execute(ctx, entryChan)
+	entryChan, scannerErrorChan := scanner.Scan(ctx, srcPath)
+	joinerErrorChan := joiner.Execute(ctx, entryChan)
+	err = r.mergeErrorChans(scannerErrorChan, joinerErrorChan)
+
 	if err == nil && ctx.Err() == nil {
 		r.logVolumeInfo(ctx, srcPath)
 		r.logVolumeInfo(ctx, dstPath)
-		util.InfoLog.Printf("볼륨 싱크 완료(%s->%s)", srcPath, dstPath)
+		util.InfoLog.Printf("volume sync complete! (%s->%s)", srcPath, dstPath)
 	}
 	return err
 
+}
+
+func (r *Runner) mergeErrorChans(in ...<-chan error) error {
+	var wg sync.WaitGroup
+	out := make(chan error, len(in))
+	output := func(c <-chan error) {
+		defer wg.Done()
+		for err := range c {
+			out <- err
+		}
+	}
+
+	wg.Add(len(in))
+	for _, c := range in {
+		go output(c)
+	}
+
+	go func() {
+		defer close(out)
+		wg.Wait()
+	}()
+
+	var errs []error
+	for err := range out {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }
 
 func (r *Runner) logLineByLine(reader io.Reader, prefix string) {
