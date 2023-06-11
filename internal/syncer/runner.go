@@ -63,6 +63,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 		invoker: &rsync.Task{
 			Arguments:       r.Common.Args.Assemble(srcPath, dstPath),
 			Retry:           r.Common.Retry,
+			SourcePath:      srcPath,
 			DestinationPath: dstPath,
 		},
 		taskSize:     r.Common.TaskSize,

@@ -17,12 +17,13 @@ type RsyncArgs struct {
 
 func (a *RsyncArgs) Assemble(src, dst string) []string {
 	args := []string{
-		"--links",
-		"--safe-links",
+		//"--links",
+		//"--safe-links",
+		//"--omit-link-times",
+		"--no-links",
 		"--times",
 		"--one-file-system",
 		"--omit-dir-times",
-		"--omit-link-times",
 		"--human-readable",
 		"--protect-args",
 		"--timeout=0",

@@ -34,6 +34,7 @@ var (
 
 type Task struct {
 	Arguments       []string
+	SourcePath      string
 	DestinationPath string
 	Retry           args.RetryArgs
 }
@@ -66,28 +67,70 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 		if mode.IsDir() {
 			// ensure mode
 			dirMode := mode.Perm() | 0o700
+
 			dirPath := filepath.Join(t.DestinationPath, entry.Path)
-			if err := os.MkdirAll(dirPath, dirMode); err != nil {
+			destExists := false
+			if dirPath == t.DestinationPath {
+				// 자기자신은 무시하자
+				continue
+			} else if destMode, err := os.Lstat(dirPath); err == nil {
+				if destExists = destMode.IsDir(); !destExists {
+					// 대상 path가 directory mode가 아닌 경우 대상을 날린다.
+					if err = os.RemoveAll(dirPath); err != nil {
+						util.ErrLog.Printf("failed to cleanup path %s :%v", dirPath, err)
+						continue
+					}
+				}
+			} else if !os.IsNotExist(err) {
 				util.ErrLog.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
+				continue
+			}
+
+			if destExists {
+				// directory path 확보상태(이미 생성됨)
+				err := os.Chmod(dirPath, dirMode)
+				if err != nil {
+					util.ErrLog.Printf("failed to change directory mode %s(%s) :%v", dirPath, dirMode, err)
+				}
+			} else {
+				// directory path 확보상태(비어있음)
+				err := os.MkdirAll(dirPath, dirMode)
+				if err != nil {
+					util.ErrLog.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
+				}
 			}
 		} else if mode.Type()&fs.ModeSymlink != 0 {
 			linkPath := filepath.Join(t.DestinationPath, entry.Path)
 			if err := os.RemoveAll(linkPath); err != nil {
-				util.ErrLog.Printf("failed to cleanup directory %s :%v", linkPath, err)
-			} else if err = os.Symlink(entry.SymlinkPath, linkPath); err != nil {
-				util.ErrLog.Printf("failed to symlink %s -> %s :%v", linkPath, entry.SymlinkPath, err)
+				util.ErrLog.Printf("failed to cleanup path %s :%v", linkPath, err)
+			} else if err = os.Symlink(entry.SymlinkPath, linkPath); err == nil {
+				continue
+			} else if !os.IsNotExist(err) {
+				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s) :%v", linkPath, entry.SymlinkPath, err)
+				continue
 			}
+
+			// directory보다 링크가 먼저 온 case
+			dirPath := filepath.Dir(linkPath)
+			if err := os.MkdirAll(dirPath, 0o755); err != nil {
+				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s), failed to create directory %s :%v",
+					linkPath, entry.SymlinkPath,
+					dirPath, err,
+				)
+			} else if err = os.Symlink(entry.SymlinkPath, linkPath); err != nil {
+				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s) :%v", linkPath, entry.SymlinkPath, err)
+			}
+
 		} else if mode.IsRegular() {
 			if addSep {
 				_ = w.WriteByte('\n')
 			} else {
 				addSep = true
 			}
-
 			_, _ = w.WriteString(entry.Path)
 			_ = w.Flush()
 		} else {
-			util.ErrLog.Printf("skip filepath %s,unexpected filemode(%s)", entry.Path, entry.Mode)
+			util.ErrLog.Printf("skip filepath %s, unexpected filemode(%s)", entry.Path, entry.Mode)
 		}
 	}
 
