@@ -84,8 +84,10 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 		}
 
 		if len(chunk) > 0 {
-			_ = sem.Acquire(ctx, 1)
-			go c.submit(ctx, taskCloser, chunk, errorChan)
+			// context문제가 있을때만 error 발생.
+			if err := sem.Acquire(ctx, 1); err == nil {
+				go c.submit(ctx, taskCloser, chunk, errorChan)
+			}
 			chunk = nil
 		}
 	}
