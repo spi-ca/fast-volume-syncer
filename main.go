@@ -119,7 +119,9 @@ func main() {
 			}
 			consumedArgs += 1
 		case consumedArgs + 2:
-			if rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0)); err == nil {
+			if flag := flags.Arg(consumedArgs + 0); flag == "_" {
+				// do nothing
+			} else if rawNodeSelector, err := strconv.Atoi(flag); err == nil {
 				nodeSelector = rawNodeSelector
 			} else {
 				fmt.Println("failed to parse nodeSelector:%w", err)
@@ -141,7 +143,9 @@ func main() {
 		case consumedArgs:
 			consumedArgs += 0
 		case consumedArgs + 1:
-			if rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0)); err == nil {
+			if flag := flags.Arg(consumedArgs + 0); flag == "_" {
+				// do nothing
+			} else if rawNodeSelector, err := strconv.Atoi(flag); err == nil {
 				nodeSelector = rawNodeSelector
 			} else {
 				fmt.Println("failed to parse nodeSelector:%w", err)
@@ -149,7 +153,9 @@ func main() {
 			}
 			consumedArgs += 1
 		case consumedArgs + 2:
-			if rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0)); err == nil {
+			if flag := flags.Arg(consumedArgs + 0); flag == "_" {
+				// do nothing
+			} else if rawNodeSelector, err := strconv.Atoi(flag); err == nil {
 				nodeSelector = rawNodeSelector
 			} else {
 				fmt.Println("failed to parse nodeSelector:%w", err)

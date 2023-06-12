@@ -71,7 +71,14 @@ func (i *Daemonizer) Execute() error {
 
 	defer logFile.Close()
 
-	invoke := exec.Command(sys.Executable(), "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath)
+	var invoke *exec.Cmd
+
+	if i.NodeSelector < 0 {
+		invoke = exec.Command(sys.Executable(), "select", "_", i.CopyInfoCSVPath)
+	} else {
+		invoke = exec.Command(sys.Executable(), "select", strconv.Itoa(i.NodeSelector), i.CopyInfoCSVPath)
+
+	}
 	invoke.Stdin = nil
 	invoke.Stdout = logFile
 	invoke.Stderr = logFile
