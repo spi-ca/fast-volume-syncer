@@ -23,8 +23,8 @@ func Syncer(
 
 	// 시그널 처리
 	exitSignal := make(chan os.Signal, 1)
-	signal.Notify(exitSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
-	defer signal.Ignore(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
+	signal.Notify(exitSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
+	defer signal.Ignore(syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -49,6 +49,7 @@ func Syncer(
 
 	// debug
 	util.InfoLog.Print("args:")
+	util.InfoLog.Print("	report.disabled=", viper.GetBool("report.disabled"))
 	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
 	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
 	util.InfoLog.Print("	rsync.delete=", viper.GetBool("rsync.delete"))
@@ -96,6 +97,7 @@ func Syncer(
 	runner := syncer.Runner{
 		Sandboxed: selectorInvoked && sandboxed && sandboxSupported,
 		Common: args.SyncerCommonArguments{
+			ReportDisabled:     viper.GetBool("report.disabled"),
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
 			Args: args.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),
@@ -133,15 +135,16 @@ func Syncer(
 		DestinationMountSubPath: dstStorageSubPath,
 	}
 	started := time.Now()
-	if err := runner.Execute(ctx); err != nil {
+	err := runner.Execute(ctx)
+	ended := time.Now()
+	if err == nil {
+		util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been ended in %s",
+			sandboxed,
+			viper.GetString("src.storage.mount.host"), srcStoragePath, srcStorageSubPath,
+			viper.GetString("dst.storage.mount.host"), dstStoragePath, dstStorageSubPath,
+			ended.Sub(started),
+		)
+	} else {
 		util.ErrLog.Fatal(err)
 	}
-	ended := time.Now()
-
-	util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been ended in %s",
-		sandboxed,
-		viper.GetString("src.storage.mount.host"), srcStoragePath, srcStorageSubPath,
-		viper.GetString("dst.storage.mount.host"), dstStoragePath, dstStorageSubPath,
-		ended.Sub(started),
-	)
 }

@@ -50,8 +50,10 @@ func (r *Runner) Execute(ctx context.Context) error {
 
 	util.InfoLog.Printf("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
 
-	r.logVolumeInfo(ctx, srcPath)
-	r.logVolumeInfo(ctx, dstPath)
+	if !r.Common.ReportDisabled {
+		r.logVolumeInfo(ctx, srcPath)
+		r.logVolumeInfo(ctx, dstPath)
+	}
 
 	util.InfoLog.Print("=> split rsync")
 	util.InfoLog.Printf("chunk size is %d", r.Common.ChunkSize)
@@ -77,9 +79,11 @@ func (r *Runner) Execute(ctx context.Context) error {
 	joinerErrorChan := joiner.Execute(ctx, entryChan)
 	err = r.mergeErrorChans(scannerErrorChan, joinerErrorChan)
 
-	if err == nil && ctx.Err() == nil {
+	if !r.Common.ReportDisabled {
 		r.logVolumeInfo(ctx, srcPath)
 		r.logVolumeInfo(ctx, dstPath)
+	}
+	if err == nil && ctx.Err() == nil {
 		util.InfoLog.Printf("volume sync complete! (%s->%s)", srcPath, dstPath)
 	}
 	return err

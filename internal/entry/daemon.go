@@ -39,6 +39,7 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 	util.InfoLog.Print("	pid.file=", viper.GetString("pid.file"))
 	util.InfoLog.Print("	log.file=", viper.GetString("log.file"))
 	util.InfoLog.Print("	monitoring.disabled=", viper.GetBool("monitoring.disabled"))
+	util.InfoLog.Print("	report.disabled=", viper.GetBool("report.disabled"))
 	util.InfoLog.Print("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
 	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
 	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
@@ -78,6 +79,7 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 		WorkerSize:      viper.GetInt("worker.size"),
 		SandboxDisabled: viper.GetBool("sandbox.disabled") || !sandboxSupported,
 		Common: args.SyncerCommonArguments{
+			ReportDisabled:     viper.GetBool("report.disabled"),
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
 			Args: args.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),

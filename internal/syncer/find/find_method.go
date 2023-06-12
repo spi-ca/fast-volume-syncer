@@ -2,7 +2,6 @@ package find
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -105,7 +104,7 @@ func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reade
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
-		line := bytes.TrimRightFunc(scanner.Bytes(), unicode.IsSpace)
+		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
 		}

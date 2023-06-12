@@ -2,7 +2,6 @@ package rsync
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -144,7 +143,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []retur
 
 	if len(fileList) == 0 {
 		for scanner.Scan() {
-			line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
+			line := scanner.Text()
 			util.InfoLog.Print(prefix, line)
 		}
 		return
@@ -175,7 +174,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []retur
 	defer bar.Close()
 
 	for scanner.Scan() {
-		line := bytes.TrimRightFunc(scanner.Bytes(), unicode.IsSpace)
+		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
 		}
@@ -197,7 +196,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []retur
 				return line[matched[i*2]:matched[i*2+1]]
 			}
 		}
-		path := string(bytes.TrimSpace(match(1)))
+		path := string(match(1))
 		if idx, contains := filenameSet[path]; !contains {
 			res.processing++
 			continue

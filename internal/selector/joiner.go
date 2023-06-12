@@ -3,6 +3,7 @@ package selector
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -64,9 +65,8 @@ func (c *workerJoiner) submit(ctx context.Context, closer func(), entry copyEntr
 	started := time.Now()
 	err := c.invoker.Run(ctx, entry)
 	ended := time.Now()
-	util.InfoLog.Printf("copyEntry completed in %2.2f ms", float32(ended.Sub(started).Microseconds())/1000)
 	if err != nil {
-		errorChan <- err
+		errorChan <- fmt.Errorf("copyEntry(%s) failed in %s: %w", entry, ended.Sub(started), err)
 	} else {
 		util.ErrLog.Printf("copyEntry(%s) completed in %s", entry, ended.Sub(started))
 	}

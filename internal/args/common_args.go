@@ -7,6 +7,7 @@ import (
 )
 
 type SyncerCommonArguments struct {
+	ReportDisabled     bool
 	SandboxMountOption string
 
 	Args RsyncArgs
@@ -30,6 +31,7 @@ type SyncerCommonArguments struct {
 func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string {
 	envs := make([]string, 0, 23)
 
+	envs = append(envs, "REPORT_DISABLED", strconv.FormatBool(i.ReportDisabled))
 	envs = append(envs, "SANDBOX_MOUNT_OPTION", i.SandboxMountOption)
 
 	envs = append(envs, "RSYNC_VERBOSE", strconv.FormatBool(i.Args.Verbose))
