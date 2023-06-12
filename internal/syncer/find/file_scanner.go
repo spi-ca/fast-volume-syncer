@@ -3,9 +3,9 @@ package find
 import (
 	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type Scanner struct {
@@ -23,17 +23,17 @@ func (s *Scanner) Scan(ctx context.Context, root string) (<-chan returns.Fileinf
 func (s *Scanner) execute(ctx context.Context, root string, entryChan chan<- returns.Fileinfo, errorChan chan<- error) {
 	defer func() {
 		if err := recover(); err != nil {
-			util.ErrLog.Printf("panic on Scanner.Scan : %v", err)
+			log.Errorf("panic on Scanner.Scan : %v", err)
 		}
 		close(errorChan)
 	}()
 
 	var scanner func(context.Context, string, chan<- returns.Fileinfo) error
 	if len(s.FinderBinaryPath) > 0 {
-		util.InfoLog.Printf("directory scan using finder")
+		log.Infof("directory scan using finder")
 		scanner = s.executeFind
 	} else {
-		util.InfoLog.Printf("directory scan using filepath.WalkDir")
+		log.Infof("directory scan using filepath.WalkDir")
 		scanner = s.scanDirectory
 	}
 

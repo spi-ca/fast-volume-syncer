@@ -2,6 +2,7 @@ package selector
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,7 +13,6 @@ import (
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type Daemonizer struct {
@@ -89,7 +89,7 @@ func (i *Daemonizer) Execute() error {
 	}
 
 	pid := invoke.Process.Pid
-	util.InfoLog.Printf("daemon process(%d) invoked! ", pid)
+	log.Infof("daemon process(%d) invoked! ", pid)
 
 	err = invoke.Process.Release()
 	if err != nil {

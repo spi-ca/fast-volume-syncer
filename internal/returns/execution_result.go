@@ -2,11 +2,10 @@ package returns
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"os/exec"
 	"strings"
 	"syscall"
-
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type ExecutionResult struct {
@@ -69,7 +68,7 @@ func (r *ExecutionResult) HandleError() error {
 
 	if exitcode == 0 {
 		if buf.Len() > 0 {
-			util.ErrLog.Print(buf.String())
+			log.Errorf(buf.String())
 		}
 		return nil
 	} else if err := r.Err; err != nil {

@@ -2,12 +2,13 @@ package entry
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/viper"
 
@@ -30,7 +31,7 @@ func Syncer(
 		case <-ctx.Done():
 			return
 		case sysSignal := <-exitSignal:
-			util.ErrLog.Println(sysSignal.String(), " received")
+			log.Errorln(sysSignal.String(), " received")
 			cancel()
 			return
 		}
@@ -41,53 +42,55 @@ func Syncer(
 	sandboxed, _ := strconv.ParseBool(os.Getenv("_SYNCER_SANDBOXED"))
 
 	if daemonized || selectorInvoked {
-		util.SetLogFlags(0)
+		util.LogFormatter.DisableColors = true
+		util.LogFormatter.DisableTimestamp = true
 	} else {
-		util.InfoLog.SetPrefix(fmt.Sprintf("syncer[%d]&1> ", os.Getpid()))
-		util.ErrLog.SetPrefix(fmt.Sprintf("syncer[%d]&2> ", os.Getpid()))
+		// todo prefix
+		//util.InfoLog.SetPrefix(fmt.Sprintf("syncer[%d]&1> ", os.Getpid()))
+		//util.ErrLog.SetPrefix(fmt.Sprintf("syncer[%d]&2> ", os.Getpid()))
 	}
 
 	// debug
-	util.InfoLog.Print("args:")
-	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
-	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
-	util.InfoLog.Print("	rsync.delete=", viper.GetBool("rsync.delete"))
-	util.InfoLog.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
-	util.InfoLog.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
-	util.InfoLog.Print("	rsync.special=", viper.GetBool("rsync.special"))
-	util.InfoLog.Print("	rsync.compress=", viper.GetBool("rsync.compress"))
-	util.InfoLog.Print("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
-	util.InfoLog.Print("	rsync.inplace=", viper.GetBool("rsync.inplace"))
-	util.InfoLog.Print("	rsync.recursive=", viper.GetBool("rsync.recursive"))
-	util.InfoLog.Print("	rsync.bandwidth.limit=", viper.GetString("rsync.bandwidth.limit"))
-	util.InfoLog.Print("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
-	util.InfoLog.Print("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
-	util.InfoLog.Print("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
-	util.InfoLog.Print("	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"))
-	util.InfoLog.Print("	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"))
-	util.InfoLog.Print("	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"))
-	util.InfoLog.Print("	scan.deadline=", viper.GetDuration("scan.deadline"))
-	util.InfoLog.Print("	scan.find.path=", viper.GetString("scan.find.path"))
-	util.InfoLog.Print("	task.size=", viper.GetInt("task.size"))
-	util.InfoLog.Print("	chunk.size=", viper.GetInt("chunk.size"))
-	util.InfoLog.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
-	util.InfoLog.Print("	retry.delay=", viper.GetDuration("retry.delay"))
-	util.InfoLog.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
-	util.InfoLog.Print("	retry.max.jitter=", viper.GetDuration("retry.max.jitter"))
-	util.InfoLog.Print("	daemonized=", daemonized)
-	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
-	util.InfoLog.Print("	sandboxed=", sandboxed)
-	util.InfoLog.Print("	argSrcStoragePath=", srcStoragePath)
-	util.InfoLog.Print("	argSrcStorageSubPath=", srcStorageSubPath)
-	util.InfoLog.Print("	argDstStoragePath=", dstStoragePath)
-	util.InfoLog.Print("	argDstStorageSubPath=", dstStorageSubPath)
-	util.InfoLog.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
-	util.InfoLog.Print("	env['_SYNCER_INVOKED']=", os.Getenv("_SYNCER_INVOKED"))
-	util.InfoLog.Print("	env['_SYNCER_SANDBOXED']=", os.Getenv("_SYNCER_SANDBOXED"))
-	util.InfoLog.Print("	env['_SLACK_MONITORING']=", os.Getenv("_SLACK_MONITORING"))
-	util.InfoLog.Print("---")
+	log.Info("args:")
+	log.Info("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
+	log.Info("	rsync.verbose=", viper.GetBool("rsync.verbose"))
+	log.Info("	rsync.delete=", viper.GetBool("rsync.delete"))
+	log.Info("	rsync.perms=", viper.GetBool("rsync.perms"))
+	log.Info("	rsync.owner=", viper.GetBool("rsync.owner"))
+	log.Info("	rsync.special=", viper.GetBool("rsync.special"))
+	log.Info("	rsync.compress=", viper.GetBool("rsync.compress"))
+	log.Info("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
+	log.Info("	rsync.inplace=", viper.GetBool("rsync.inplace"))
+	log.Info("	rsync.recursive=", viper.GetBool("rsync.recursive"))
+	log.Info("	rsync.bandwidth.limit=", viper.GetString("rsync.bandwidth.limit"))
+	log.Info("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
+	log.Info("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
+	log.Info("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
+	log.Info("	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"))
+	log.Info("	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"))
+	log.Info("	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"))
+	log.Info("	scan.deadline=", viper.GetDuration("scan.deadline"))
+	log.Info("	scan.find.path=", viper.GetString("scan.find.path"))
+	log.Info("	task.size=", viper.GetInt("task.size"))
+	log.Info("	chunk.size=", viper.GetInt("chunk.size"))
+	log.Info("	retry.attempts=", viper.GetInt("retry.attempts"))
+	log.Info("	retry.delay=", viper.GetDuration("retry.delay"))
+	log.Info("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
+	log.Info("	retry.max.jitter=", viper.GetDuration("retry.max.jitter"))
+	log.Info("	daemonized=", daemonized)
+	log.Info("	sandboxSupported=", sandboxSupported)
+	log.Info("	sandboxed=", sandboxed)
+	log.Info("	argSrcStoragePath=", srcStoragePath)
+	log.Info("	argSrcStorageSubPath=", srcStorageSubPath)
+	log.Info("	argDstStoragePath=", dstStoragePath)
+	log.Info("	argDstStorageSubPath=", dstStorageSubPath)
+	log.Info("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
+	log.Info("	env['_SYNCER_INVOKED']=", os.Getenv("_SYNCER_INVOKED"))
+	log.Info("	env['_SYNCER_SANDBOXED']=", os.Getenv("_SYNCER_SANDBOXED"))
+	log.Info("	env['_SLACK_MONITORING']=", os.Getenv("_SLACK_MONITORING"))
+	log.Info("---")
 
-	util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been initiated",
+	log.Infof("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been initiated",
 		sandboxed,
 		viper.GetString("src.storage.mount.host"), srcStoragePath, srcStorageSubPath,
 		viper.GetString("dst.storage.mount.host"), dstStoragePath, dstStorageSubPath,
@@ -134,11 +137,11 @@ func Syncer(
 	}
 	started := time.Now()
 	if err := runner.Execute(ctx); err != nil {
-		util.ErrLog.Fatal(err)
+		log.Fatal(err)
 	}
 	ended := time.Now()
 
-	util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been ended in %s",
+	log.Infof("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been ended in %s",
 		sandboxed,
 		viper.GetString("src.storage.mount.host"), srcStoragePath, srcStorageSubPath,
 		viper.GetString("dst.storage.mount.host"), dstStoragePath, dstStorageSubPath,

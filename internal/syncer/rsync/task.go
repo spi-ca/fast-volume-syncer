@@ -5,9 +5,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,7 +25,6 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 var (
@@ -77,12 +76,12 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 				if destExists = destMode.IsDir(); !destExists {
 					// 대상 path가 directory mode가 아닌 경우 대상을 날린다.
 					if err = os.RemoveAll(dirPath); err != nil {
-						util.ErrLog.Printf("failed to cleanup path %s :%v", dirPath, err)
+						log.Errorf("failed to cleanup path %s :%v", dirPath, err)
 						continue
 					}
 				}
 			} else if !os.IsNotExist(err) {
-				util.ErrLog.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
+				log.Errorf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
 				continue
 			}
 
@@ -90,35 +89,35 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 				// directory path 확보상태(이미 생성됨)
 				err := os.Chmod(dirPath, dirMode)
 				if err != nil {
-					util.ErrLog.Printf("failed to change directory mode %s(%s) :%v", dirPath, dirMode, err)
+					log.Errorf("failed to change directory mode %s(%s) :%v", dirPath, dirMode, err)
 				}
 			} else {
 				// directory path 확보상태(비어있음)
 				err := os.MkdirAll(dirPath, dirMode)
 				if err != nil {
-					util.ErrLog.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
+					log.Errorf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
 				}
 			}
 		} else if mode.Type()&fs.ModeSymlink != 0 {
 			linkPath := filepath.Join(t.DestinationPath, entry.Path)
 			if err := os.RemoveAll(linkPath); err != nil {
-				util.ErrLog.Printf("failed to cleanup path %s :%v", linkPath, err)
+				log.Errorf("failed to cleanup path %s :%v", linkPath, err)
 			} else if err = os.Symlink(entry.SymlinkPath, linkPath); err == nil {
 				continue
 			} else if !os.IsNotExist(err) {
-				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s) :%v", linkPath, entry.SymlinkPath, err)
+				log.Errorf("failed to make a symbolic link(%s -> %s) :%v", linkPath, entry.SymlinkPath, err)
 				continue
 			}
 
 			// directory보다 링크가 먼저 온 case
 			dirPath := filepath.Dir(linkPath)
 			if err := os.MkdirAll(dirPath, 0o755); err != nil {
-				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s), failed to create directory %s :%v",
+				log.Errorf("failed to make a symbolic link(%s -> %s), failed to create directory %s :%v",
 					linkPath, entry.SymlinkPath,
 					dirPath, err,
 				)
 			} else if err = os.Symlink(entry.SymlinkPath, linkPath); err != nil {
-				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s) :%v", linkPath, entry.SymlinkPath, err)
+				log.Errorf("failed to make a symbolic link(%s -> %s) :%v", linkPath, entry.SymlinkPath, err)
 			}
 
 		} else if mode.IsRegular() {
@@ -130,7 +129,7 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 			_, _ = w.WriteString(entry.Path)
 			_ = w.Flush()
 		} else {
-			util.ErrLog.Printf("skip filepath %s, unexpected filemode(%s)", entry.Path, entry.Mode)
+			log.Errorf("skip filepath %s, unexpected filemode(%s)", entry.Path, entry.Mode)
 		}
 	}
 
@@ -145,7 +144,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []retur
 	if len(fileList) == 0 {
 		for scanner.Scan() {
 			line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
-			util.InfoLog.Print(prefix, line)
+			log.Info(prefix, line)
 		}
 		return
 	}
@@ -156,7 +155,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []retur
 	}
 
 	bar := progressbar.NewOptions(res.total,
-		progressbar.OptionSetWriter(util.LogWriter{}),
+		progressbar.OptionSetWriter(log.StandardLogger().Writer()),
 		progressbar.OptionShowElapsedTimeOnFinish(),
 		progressbar.OptionShowCount(),
 		progressbar.OptionShowIts(),
@@ -221,7 +220,7 @@ func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closeChan chan<-
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
 		res.appendLogLine(line)
-		util.ErrLog.Print(prefix, line)
+		log.Error(prefix, line)
 	}
 }
 
@@ -277,6 +276,6 @@ func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinf
 	}
 
 	res.err = invoke.Wait()
-	util.InfoLog.Print(res)
+	log.Info(res)
 	return res.HandleError()
 }

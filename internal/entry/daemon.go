@@ -1,6 +1,7 @@
 package entry
 
 import (
+	log "github.com/sirupsen/logrus"
 	"os"
 	"syscall"
 
@@ -8,66 +9,65 @@ import (
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/selector"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 func DaemonStop() {
 	pidFilePath := viper.GetString("pid.file")
 	pid, err := selector.ReadPidFile(pidFilePath)
 	if err != nil {
-		util.ErrLog.Fatal(err)
+		log.Fatal(err)
 	} else if pid < 1 {
-		util.ErrLog.Fatalf("invalid pid(%d)", pid)
+		log.Fatalf("invalid pid(%d)", pid)
 	}
 
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		util.ErrLog.Fatalf("failed to find process(%d) :%v", pid, err)
+		log.Fatalf("failed to find process(%d) :%v", pid, err)
 	}
 	defer proc.Release()
 
 	err = proc.Signal(syscall.SIGTERM)
 	if err != nil {
-		util.ErrLog.Fatalf("failed to SIGTERM(%d) :%v", pid, err)
+		log.Fatalf("failed to SIGTERM(%d) :%v", pid, err)
 	}
-	util.InfoLog.Printf("sending SIGTERM(%d)", pid)
+	log.Infof("sending SIGTERM(%d)", pid)
 }
 
 func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) {
 
-	util.InfoLog.Print("args:")
-	util.InfoLog.Print("	pid.file=", viper.GetString("pid.file"))
-	util.InfoLog.Print("	log.file=", viper.GetString("log.file"))
-	util.InfoLog.Print("	monitoring.disabled=", viper.GetBool("monitoring.disabled"))
-	util.InfoLog.Print("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
-	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
-	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
-	util.InfoLog.Print("	rsync.delete=", viper.GetBool("rsync.delete"))
-	util.InfoLog.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
-	util.InfoLog.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
-	util.InfoLog.Print("	rsync.special=", viper.GetBool("rsync.special"))
-	util.InfoLog.Print("	rsync.compress=", viper.GetBool("rsync.compress"))
-	util.InfoLog.Print("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
-	util.InfoLog.Print("	rsync.inplace=", viper.GetBool("rsync.inplace"))
-	util.InfoLog.Print("	rsync.recursive=", viper.GetBool("rsync.recursive"))
-	util.InfoLog.Print("	rsync.bandwidth.limit=", viper.GetString("rsync.bandwidth.limit"))
-	util.InfoLog.Print("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
-	util.InfoLog.Print("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
-	util.InfoLog.Print("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
-	util.InfoLog.Print("	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"))
-	util.InfoLog.Print("	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"))
-	util.InfoLog.Print("	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"))
-	util.InfoLog.Print("	scan.deadline=", viper.GetDuration("scan.deadline"))
-	util.InfoLog.Print("	scan.find.path=", viper.GetString("scan.find.path"))
-	util.InfoLog.Print("	worker.size=", viper.GetString("worker.size"))
-	util.InfoLog.Print("	task.size=", viper.GetInt("task.size"))
-	util.InfoLog.Print("	chunk.size=", viper.GetInt("chunk.size"))
-	util.InfoLog.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
-	util.InfoLog.Print("	retry.delay=", viper.GetDuration("retry.delay"))
-	util.InfoLog.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
-	util.InfoLog.Print("	retry.max.jitter=", viper.GetDuration("retry.max.jitter"))
-	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
-	util.InfoLog.Print("---")
+	log.Info("args:")
+	log.Info("	pid.file=", viper.GetString("pid.file"))
+	log.Info("	log.file=", viper.GetString("log.file"))
+	log.Info("	monitoring.disabled=", viper.GetBool("monitoring.disabled"))
+	log.Info("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
+	log.Info("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
+	log.Info("	rsync.verbose=", viper.GetBool("rsync.verbose"))
+	log.Info("	rsync.delete=", viper.GetBool("rsync.delete"))
+	log.Info("	rsync.perms=", viper.GetBool("rsync.perms"))
+	log.Info("	rsync.owner=", viper.GetBool("rsync.owner"))
+	log.Info("	rsync.special=", viper.GetBool("rsync.special"))
+	log.Info("	rsync.compress=", viper.GetBool("rsync.compress"))
+	log.Info("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
+	log.Info("	rsync.inplace=", viper.GetBool("rsync.inplace"))
+	log.Info("	rsync.recursive=", viper.GetBool("rsync.recursive"))
+	log.Info("	rsync.bandwidth.limit=", viper.GetString("rsync.bandwidth.limit"))
+	log.Info("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
+	log.Info("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
+	log.Info("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
+	log.Info("	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"))
+	log.Info("	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"))
+	log.Info("	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"))
+	log.Info("	scan.deadline=", viper.GetDuration("scan.deadline"))
+	log.Info("	scan.find.path=", viper.GetString("scan.find.path"))
+	log.Info("	worker.size=", viper.GetString("worker.size"))
+	log.Info("	task.size=", viper.GetInt("task.size"))
+	log.Info("	chunk.size=", viper.GetInt("chunk.size"))
+	log.Info("	retry.attempts=", viper.GetInt("retry.attempts"))
+	log.Info("	retry.delay=", viper.GetDuration("retry.delay"))
+	log.Info("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
+	log.Info("	retry.max.jitter=", viper.GetDuration("retry.max.jitter"))
+	log.Info("	sandboxSupported=", sandboxSupported)
+	log.Info("---")
 
 	runner := selector.Daemonizer{
 		SlackMonitoring: !viper.GetBool("monitoring.disabled"),
@@ -112,7 +112,7 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 		},
 	}
 	if err := runner.Execute(); err != nil {
-		util.ErrLog.Fatal(err)
+		log.Fatal(err)
 	}
-	util.InfoLog.Println("daemon started")
+	log.Info("daemon started")
 }

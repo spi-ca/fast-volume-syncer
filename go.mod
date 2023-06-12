@@ -6,6 +6,7 @@ require (
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/moby/sys/mount v0.3.3
 	github.com/schollz/progressbar/v3 v3.13.1
+	github.com/sirupsen/logrus v1.9.3
 	github.com/slack-go/slack v0.12.2
 	github.com/sony/gobreaker v0.5.0
 	github.com/spf13/pflag v1.0.5

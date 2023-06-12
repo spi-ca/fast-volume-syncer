@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"io/fs"
 	"os"
@@ -93,7 +94,7 @@ func (s *Scanner) handleFindStderr(res *returns.ExecutionResult, reader io.Reade
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
 		res.AppendLogLine(line)
-		util.ErrLog.Print(prefix, line)
+		log.Error(prefix, line)
 	}
 }
 
@@ -111,13 +112,13 @@ func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reade
 		}
 		entry, err := s.parseFindEntry(line)
 		if err != nil {
-			util.ErrLog.Printf("[%d]failed to parse find line: %s, %v", res.PID, string(line), err)
+			log.Errorf("[%d]failed to parse find line: %s, %v", res.PID, string(line), err)
 			continue
 		}
 
 		relPath, err := filepath.Rel(root, entry.Path)
 		if err != nil {
-			util.ErrLog.Printf("[%d]failed to make relative file path info: %v", res.PID, err)
+			log.Errorf("[%d]failed to make relative file path info: %v", res.PID, err)
 			continue
 		}
 		entry.Path = relPath
@@ -163,7 +164,7 @@ func (s *Scanner) executeFind(parentContext context.Context, root string, rowCha
 	stderrClosed := make(chan struct{})
 	go s.handleFindStderr(res, stderr, stderrClosed)
 
-	util.InfoLog.Printf("find started(%d)", res.PID)
+	log.Infof("find started(%d)", res.PID)
 
 	select {
 	case <-stdoutClosed:
@@ -179,6 +180,6 @@ func (s *Scanner) executeFind(parentContext context.Context, root string, rowCha
 	res.Err = invoke.Wait()
 	ended := time.Now()
 
-	util.InfoLog.Printf("find(%d) ended in %2.2f ms", &res, float32(ended.Sub(started).Microseconds())/1000)
+	log.Infof("find(%d) ended in %2.2f ms", &res, float32(ended.Sub(started).Microseconds())/1000)
 	return res.HandleError()
 }

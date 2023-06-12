@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"os/exec"
@@ -16,7 +17,6 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type Invoker struct {
@@ -93,7 +93,7 @@ func (i *Invoker) handleStdout(res *returns.ExecutionResult, reader io.Reader, c
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
-		util.InfoLog.Print(prefix, line)
+		log.Info(prefix, line)
 	}
 }
 
@@ -104,6 +104,6 @@ func (i *Invoker) handleStderr(res *returns.ExecutionResult, reader io.Reader, c
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
 		res.AppendLogLine(line)
-		util.ErrLog.Print(prefix, line)
+		log.Error(prefix, line)
 	}
 }
