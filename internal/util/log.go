@@ -1,60 +1,46 @@
 package util
 
 import (
-	log "github.com/sirupsen/logrus"
-	"io"
-	glog "log"
+	"bufio"
+	"bytes"
+	"log"
 	"os"
+	"strings"
 )
 
 var (
-	LogFormatter = &log.TextFormatter{
-		DisableColors:   true,
-		TimestampFormat: "060102150405",
-	}
+	InfoLog = log.Default()
+	ErrLog  = log.New(os.Stderr, "", log.LstdFlags)
 )
 
 func init() {
-	log.SetFormatter(LogFormatter)
-	log.SetOutput(io.Discard)
-	log.SetLevel(log.InfoLevel)
-	glog.SetOutput(log.StandardLogger().Writer())
-	log.AddHook(&WriterHook{
-		Writer: os.Stderr,
-		LogLevels: []log.Level{
-			log.PanicLevel,
-			log.FatalLevel,
-			log.ErrorLevel,
-			log.WarnLevel,
-		},
-	})
-	log.AddHook(&WriterHook{
-		Writer: os.Stdout,
-		LogLevels: []log.Level{
-			log.InfoLevel,
-			log.DebugLevel,
-		},
-	})
+	InfoLog.SetOutput(os.Stdout)
 }
 
-// WriterHook is a hook that writes logs of specified LogLevels to specified Writer
-type WriterHook struct {
-	Writer    io.Writer
-	LogLevels []log.Level
+type LogWriter struct {
 }
 
-// Fire will be called when some logging function is called with current hook
-// It will format log entry to string and write it to appropriate writer
-func (hook *WriterHook) Fire(entry *log.Entry) error {
-	line, err := entry.Bytes()
-	if err != nil {
-		return err
+func (w LogWriter) Write(b []byte) (int, error) {
+	if len(b) < 1 {
+		return 0, nil
 	}
-	_, err = hook.Writer.Write(line)
-	return err
+
+	scanner := bufio.NewScanner(bytes.NewReader(b))
+	for scanner.Scan() {
+		trimmed := strings.TrimSpace(scanner.Text())
+		if len(trimmed) < 1 {
+			continue
+		}
+
+		if crIndex := strings.LastIndexByte(trimmed, '\r'); crIndex > 0 {
+			trimmed = trimmed[crIndex:]
+		}
+		_ = log.Output(1, trimmed)
+	}
+	return len(b), nil
 }
 
-// Levels define on which log levels this hook would trigger
-func (hook *WriterHook) Levels() []log.Level {
-	return hook.LogLevels
+func SetLogFlags(flag int) {
+	InfoLog.SetFlags(flag)
+	ErrLog.SetFlags(flag)
 }

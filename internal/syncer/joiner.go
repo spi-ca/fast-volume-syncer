@@ -3,7 +3,6 @@ package syncer
 import (
 	"context"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"sync"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/rsync"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type chunkJoiner struct {
@@ -32,7 +32,7 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 	deadline := time.NewTicker(c.scanDuration)
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("panic on chunkJoiner: %v", err)
+			util.ErrLog.Printf("panic on chunkJoiner: %v", err)
 		}
 		_ = sem.Acquire(context.Background(), int64(c.taskSize))
 		close(errorChan)
@@ -47,7 +47,7 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 
 	taskCloser := func(chunk []returns.Fileinfo) {
 		if err := recover(); err != nil {
-			log.Errorf("panic on chunkHandler: %v", err)
+			util.ErrLog.Printf("panic on chunkHandler: %v", err)
 		}
 		sem.Release(1)
 		chunkPool.Put(chunk[0:0])

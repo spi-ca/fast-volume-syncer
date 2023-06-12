@@ -21,7 +21,7 @@ func TestLogger(t *testing.T) {
 		progressbar.OptionShowCount(),
 		progressbar.OptionShowIts(),
 		progressbar.OptionSetWidth(15),
-		progressbar.OptionSetElapsedTime(true),
+		progressbar.OptionSetPredictTime(false),
 		progressbar.OptionThrottle(time.Second),
 		progressbar.OptionSetItsString("op"),
 		progressbar.OptionSetDescription(fmt.Sprintf("rsync[%d]", 33)),
@@ -39,6 +39,7 @@ func TestLogger(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 }
+
 func TestRsyncTask_Regex(t *testing.T) {
 	re := regexp.MustCompile(`^(.+?)( is uptodate)?$`)
 

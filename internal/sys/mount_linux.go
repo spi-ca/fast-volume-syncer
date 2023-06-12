@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"github.com/moby/sys/mount"
 	"os"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 func Sandbox(sandboxMountOption string) error {
@@ -42,7 +44,7 @@ func Sandbox(sandboxMountOption string) error {
 		return fmt.Errorf("failed to mount %s : %w", tmpDir, err)
 	}
 
-	log.Info("the process is sandboxed")
+	util.InfoLog.Print("the process is sandboxed")
 	return nil
 }
 

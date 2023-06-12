@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"os/exec"
@@ -21,6 +20,7 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/find"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/rsync"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 var (
@@ -48,13 +48,13 @@ func (r *Runner) Execute(ctx context.Context) error {
 		return err
 	}
 
-	log.Infof("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
+	util.InfoLog.Printf("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
 
 	r.logVolumeInfo(ctx, srcPath)
 	r.logVolumeInfo(ctx, dstPath)
 
-	log.Info("=> split rsync")
-	log.Infof("chunk size is %d", r.Common.ChunkSize)
+	util.InfoLog.Print("=> split rsync")
+	util.InfoLog.Printf("chunk size is %d", r.Common.ChunkSize)
 
 	scanner := find.Scanner{
 		FinderBinaryPath: finderBinaryPath,
@@ -80,7 +80,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 	if err == nil && ctx.Err() == nil {
 		r.logVolumeInfo(ctx, srcPath)
 		r.logVolumeInfo(ctx, dstPath)
-		log.Infof("volume sync complete! (%s->%s)", srcPath, dstPath)
+		util.InfoLog.Printf("volume sync complete! (%s->%s)", srcPath, dstPath)
 	}
 	return err
 
@@ -117,29 +117,29 @@ func (r *Runner) logLineByLine(reader io.Reader, prefix string) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
-		log.Info(prefix, line)
+		util.InfoLog.Print(prefix, line)
 	}
 }
 
 func (r *Runner) logVolumeInfo(ctx context.Context, path string) {
 	if out, err := exec.CommandContext(ctx, "ls", "-al", path).CombinedOutput(); err != nil {
-		log.Errorf("failed to start executable(ls): %v", err)
+		util.ErrLog.Printf("failed to start executable(ls): %v", err)
 	} else {
-		log.Infof("directory_info(%s)=>", path)
+		util.InfoLog.Printf("directory_info(%s)=>", path)
 		r.logLineByLine(bytes.NewReader(out), "\t")
 	}
 
 	if out, err := exec.CommandContext(ctx, "findmnt", "-T", path).CombinedOutput(); err != nil {
-		log.Errorf("failed to start executable(findmnt): %v", err)
+		util.ErrLog.Printf("failed to start executable(findmnt): %v", err)
 	} else {
-		log.Infof("mount_info(%s)=>", path)
+		util.InfoLog.Printf("mount_info(%s)=>", path)
 		r.logLineByLine(bytes.NewReader(out), "\t")
 	}
 
 	if out, err := exec.CommandContext(ctx, "df", "-h", path).CombinedOutput(); err != nil {
-		log.Errorf("failed to start executable(df): %v", err)
+		util.ErrLog.Printf("failed to start executable(df): %v", err)
 	} else {
-		log.Infof("fs            =>\t")
+		util.InfoLog.Printf("fs            =>\t")
 		r.logLineByLine(bytes.NewReader(out), "\t")
 	}
 }
@@ -150,7 +150,7 @@ func (r *Runner) locateFindBinary() string {
 	}
 
 	if foundPath, err := exec.LookPath(r.Common.FinderBinaryPath); err != nil {
-		log.Errorf("find path(%s) not found", r.Common.FinderBinaryPath)
+		util.ErrLog.Printf("find path(%s) not found", r.Common.FinderBinaryPath)
 		return ""
 	} else {
 		absPath, _ := filepath.Abs(foundPath)
@@ -170,7 +170,7 @@ func (r *Runner) prepareDirectory() (string, string, string, error) {
 		return "", "", "", fmt.Errorf("failed to make temp directory: %w", err)
 	}
 
-	log.Infof("created temporary directory: '%s'", tempDir)
+	util.InfoLog.Printf("created temporary directory: '%s'", tempDir)
 
 	if err = os.Chdir(tempDir); err != nil {
 		return tempDir, "", "", fmt.Errorf("failed to change directory(%s): %w", tempDir, err)
@@ -200,12 +200,12 @@ func (r *Runner) prepareDirectory() (string, string, string, error) {
 	if err = sys.Mount(srcMountInfo.Source(), srcMountPath, srcMountInfo.Type(), srcMountInfo.RefinedOptions()); err != nil {
 		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", dstMountInfo, srcMountPath, err)
 	}
-	log.Infof("source mount success!(%s %s)", srcMountInfo, srcMountPath)
+	util.InfoLog.Printf("source mount success!(%s %s)", srcMountInfo, srcMountPath)
 
 	if err = sys.Mount(dstMountInfo.Source(), dstMountPath, dstMountInfo.Type(), dstMountInfo.RefinedOptions()); err != nil {
 		return tempDir, "", "", fmt.Errorf("mount failed(%s %s) : %w", dstMountInfo, dstMountPath, err)
 	}
-	log.Infof("destination mount success!(%s %s)", dstMountInfo, dstMountPath)
+	util.InfoLog.Printf("destination mount success!(%s %s)", dstMountInfo, dstMountPath)
 
 	// source 확인
 	sourceStat, err := os.Stat(srcMountSubPath)
@@ -220,7 +220,7 @@ func (r *Runner) prepareDirectory() (string, string, string, error) {
 	destinationFilemode := sourceStat.Mode() | 0o700
 
 	if err := os.MkdirAll(dstMountSubPath, destinationFilemode.Perm()); err == nil {
-		log.Infof("directory %s created", dstMountSubPath)
+		util.InfoLog.Printf("directory %s created", dstMountSubPath)
 	}
 
 	return tempDir, srcMountSubPath, dstMountSubPath, nil
@@ -243,12 +243,12 @@ func (r *Runner) cleanupDirectory(tempPath string) {
 
 	for _, path := range umountPaths {
 		if err := sys.Umount(path); err != nil {
-			log.Errorf("failed to unmount %s: %s", path, err)
+			util.ErrLog.Printf("failed to unmount %s: %s", path, err)
 		}
 	}
 	for _, path := range removePaths {
 		if err := os.Remove(path); err != nil {
-			log.Errorf("failed to remove %s: %s", path, err)
+			util.ErrLog.Printf("failed to remove %s: %s", path, err)
 		}
 	}
 }

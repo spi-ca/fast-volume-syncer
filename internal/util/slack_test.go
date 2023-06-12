@@ -1,18 +1,23 @@
 package util
 
 import (
+	"io"
+	"log"
 	"os"
 	"testing"
-
-	log "github.com/sirupsen/logrus"
 )
 
 func TestSendSlackMessage(t *testing.T) {
 	SlackSender.Start()
 	defer SlackSender.Close()
-	log.AddHook(SlackSender)
-	for i := 0; i < 100; i++ {
-		log.Errorf("TestRunner_sendErrorMessage test (%d)", i)
+	prevWriter := ErrLog.Writer()
+	defer func() {
+		ErrLog.SetOutput(prevWriter)
+		SlackSender.Close()
+	}()
+	ErrLog.SetOutput(io.MultiWriter(prevWriter, SlackSender))
+	for i := 0; i < 5; i++ {
+		ErrLog.Printf("TestRunner_sendErrorMessage test (%d)", i)
 	}
 }
 func TestSymlink(t *testing.T) {

@@ -3,11 +3,12 @@ package selector
 import (
 	"context"
 	"encoding/csv"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"strconv"
 	"strings"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type Runner struct {
@@ -48,9 +49,9 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 	const entryNum = 15
 	readItems := 0
 	defer func() {
-		log.Infof("read %d items", readItems)
+		util.InfoLog.Printf("read %d items", readItems)
 		if err := recover(); err != nil {
-			log.Errorf("panic on Runner.loadCopyEntryCSV : %v", err)
+			util.ErrLog.Printf("panic on Runner.loadCopyEntryCSV : %v", err)
 		}
 	}()
 
@@ -63,7 +64,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 			err = nil
 			break
 		} else if err != nil {
-			log.Errorf("read csv failed: %v", err)
+			util.ErrLog.Printf("read csv failed: %v", err)
 			break
 		} else if len(row) < entryNum {
 			continue
@@ -75,7 +76,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 
 		nodeNum, err := strconv.Atoi(row[0])
 		if err != nil {
-			log.Errorf("node field parse failed: %v", err)
+			util.ErrLog.Printf("node field parse failed: %v", err)
 			continue
 		} else if r.NodeSelector >= 0 && r.NodeSelector != nodeNum {
 			continue
@@ -89,7 +90,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 		entry.DestinationPath = strings.TrimSpace(row[4])
 		entry.SourceProjectId, err = strconv.Atoi(row[5])
 		if err != nil {
-			log.Errorf("source_project_id field parse  failed: %v", err)
+			util.ErrLog.Printf("source_project_id field parse  failed: %v", err)
 			continue
 		}
 
@@ -97,7 +98,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 
 		entry.UsedSize, err = strconv.ParseInt(row[7], 10, 64)
 		if err != nil {
-			log.Errorf("used_size field parse  failed: %v", err)
+			util.ErrLog.Printf("used_size field parse  failed: %v", err)
 			continue
 		}
 
@@ -105,7 +106,7 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 		entry.VolumeType = strings.TrimSpace(row[9])
 		entry.VolumeSize, err = strconv.ParseInt(row[10], 10, 64)
 		if err != nil {
-			log.Errorf("volume_size field parse  failed: %v", err)
+			util.ErrLog.Printf("volume_size field parse  failed: %v", err)
 			continue
 		}
 		entry.VolumeSizeHuman = strings.TrimSpace(row[11])

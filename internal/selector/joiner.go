@@ -3,10 +3,11 @@ package selector
 import (
 	"context"
 	"errors"
-	log "github.com/sirupsen/logrus"
 	"time"
 
 	"golang.org/x/sync/semaphore"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
 type workerJoiner struct {
@@ -31,14 +32,14 @@ func (c *workerJoiner) dispatch(ctx context.Context, entryRecvChan <-chan copyEn
 		_ = sem.Acquire(context.Background(), int64(c.workerSize))
 		close(errorChan)
 		if err := recover(); err != nil {
-			log.Errorf("panic on workerJoiner: %v", err)
+			util.ErrLog.Printf("panic on workerJoiner: %v", err)
 		}
 	}()
 
 	workerCloser := func() {
 		sem.Release(1)
 		if err := recover(); err != nil {
-			log.Errorf("panic on worker: %v", err)
+			util.ErrLog.Printf("panic on worker: %v", err)
 		}
 	}
 
@@ -63,10 +64,10 @@ func (c *workerJoiner) submit(ctx context.Context, closer func(), entry copyEntr
 	started := time.Now()
 	err := c.invoker.Run(ctx, entry)
 	ended := time.Now()
-	log.Infof("copyEntry completed in %2.2f ms", float32(ended.Sub(started).Microseconds())/1000)
+	util.InfoLog.Printf("copyEntry completed in %2.2f ms", float32(ended.Sub(started).Microseconds())/1000)
 	if err != nil {
 		errorChan <- err
 	} else {
-		log.Errorf("copyEntry(%s) completed in %s", entry, ended.Sub(started))
+		util.ErrLog.Printf("copyEntry(%s) completed in %s", entry, ended.Sub(started))
 	}
 }

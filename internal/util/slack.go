@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/avast/retry-go"
 
 	"github.com/slack-go/slack/slackutilsx"
@@ -40,9 +38,9 @@ var (
 			},
 			OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
 				if from == gobreaker.StateClosed && to == gobreaker.StateOpen {
-					log.Errorf("%sendpoint unavailable", loggerPrefix)
+					ErrLog.Printf("%sendpoint unavailable", loggerPrefix)
 				} else if from == gobreaker.StateHalfOpen && to == gobreaker.StateClosed {
-					log.Errorf("%sendpoint is returning available", loggerPrefix)
+					ErrLog.Printf("%sendpoint is returning available", loggerPrefix)
 				}
 			},
 		}),
@@ -66,36 +64,8 @@ type slackSender struct {
 	m              sync.RWMutex
 }
 
-func (s *slackSender) Levels() []log.Level {
-	return []log.Level{
-		log.PanicLevel,
-		log.FatalLevel,
-		log.ErrorLevel,
-		log.WarnLevel,
-	}
-}
-func (s *slackSender) Fire(entry *log.Entry) error {
-
-	line, err := entry.String()
-	if err != nil {
-		return err
-	}
-
-	if len(line) < 1 {
-		return nil
-	}
-
-	s.m.RLock()
-	defer s.m.RUnlock()
-
-	if s.messageChan != nil {
-		s.messageChan <- line
-	}
-	return nil
-}
-
 func (s *slackSender) Send(message string) {
-	log.Errorf(message)
+	ErrLog.Printf(message)
 	s.m.RLock()
 	defer s.m.RUnlock()
 	if s.messageChan == nil {
@@ -132,25 +102,24 @@ func (s *slackSender) Close() {
 	s.doneChan = nil
 }
 
-//
-//func (s *slackSender) Write(b []byte) (int, error) {
-//	if len(b) < 1 {
-//		return 0, nil
-//	}
-//	s.m.RLock()
-//	defer s.m.RUnlock()
-//
-//	if s.messageChan != nil {
-//		s.messageChan <- string(b)
-//	}
-//	return len(b), nil
-//}
+func (s *slackSender) Write(b []byte) (int, error) {
+	if len(b) < 1 {
+		return 0, nil
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+
+	if s.messageChan != nil {
+		s.messageChan <- string(b)
+	}
+	return len(b), nil
+}
 
 func (s *slackSender) senderLoop(msgChan <-chan string, doneChan chan<- struct{}) {
 	deadline := time.NewTicker(5 * time.Second)
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("%spanic on slackSender.senderLoop: %v", loggerPrefix, err)
+			ErrLog.Printf("%spanic on slackSender.senderLoop: %v", loggerPrefix, err)
 		}
 		deadline.Stop()
 		close(doneChan)
@@ -203,7 +172,7 @@ func (s *slackSender) senderLoop(msgChan <-chan string, doneChan chan<- struct{}
 		if builder.Len() > 0 {
 			msgContainer.Text = builder.String()
 			if err := retry.Do(retryFunc, retryArgs...); err != nil {
-				log.Errorf("%sfailed to send message: %v", loggerPrefix, err)
+				ErrLog.Printf("%sfailed to send message: %v", loggerPrefix, err)
 			}
 			builder.Reset()
 		}
@@ -213,7 +182,7 @@ func (s *slackSender) senderLoop(msgChan <-chan string, doneChan chan<- struct{}
 			builder.WriteString(remainMessage)
 			msgContainer.Text = builder.String()
 			if err := retry.Do(retryFunc, retryArgs...); err != nil {
-				log.Errorf("%sfailed to send message: %v", loggerPrefix, err)
+				ErrLog.Printf("%sfailed to send message: %v", loggerPrefix, err)
 			}
 			remainMessage = ""
 			builder.Reset()
