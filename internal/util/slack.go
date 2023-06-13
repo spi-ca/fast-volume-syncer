@@ -110,7 +110,11 @@ func (s *slackSender) Write(b []byte) (int, error) {
 	defer s.m.RUnlock()
 
 	if s.messageChan != nil {
-		s.messageChan <- string(b)
+		select {
+		case <-s.doneChan:
+			return 0, fmt.Errorf("sender closed")
+		case s.messageChan <- string(b):
+		}
 	}
 	return len(b), nil
 }

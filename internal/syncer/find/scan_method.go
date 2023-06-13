@@ -12,7 +12,6 @@ import (
 )
 
 func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) error {
-	defer close(rowChan)
 	var errs []error
 	iter := func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -39,7 +38,9 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 		}
 		if (info.Mode().Type() & fs.ModeSymlink) != 0 {
 			entry.SymlinkPath, err = os.Readlink(path)
-			errs = append(errs, fmt.Errorf("failed to execute readlink file(%s) info: %w", path, err))
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to execute readlink file(%s) info: %w", path, err))
+			}
 			return nil
 		}
 		select {

@@ -77,7 +77,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 		if pidFilePath := os.Getenv("_PID_FILEPATH"); len(pidFilePath) > 0 {
 			closer, err := selector.AcquirePidFile(pidFilePath)
 			if err != nil {
-				util.ErrLog.Println("selector already running : %v", err)
+				util.ErrLog.Printf("selector already running : %v", err)
 				return
 			}
 			defer closer()

@@ -2,7 +2,6 @@ package selector
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -16,45 +15,34 @@ type workerJoiner struct {
 	invoker    *Invoker
 }
 
-func (c *workerJoiner) Execute(ctx context.Context, entryRecvChan <-chan copyEntry) error {
+func (c *workerJoiner) Execute(ctx context.Context, entryRecvChan <-chan copyEntry) <-chan error {
 	errorChan := make(chan error, c.workerSize)
 	go c.dispatch(ctx, entryRecvChan, errorChan)
-
-	var errs []error
-	for err := range errorChan {
-		errs = append(errs, err)
-	}
-	return errors.Join(errs...)
+	return errorChan
 }
 
 func (c *workerJoiner) dispatch(ctx context.Context, entryRecvChan <-chan copyEntry, errorChan chan<- error) {
 	sem := semaphore.NewWeighted(int64(c.workerSize))
 	defer func() {
-		_ = sem.Acquire(context.Background(), int64(c.workerSize))
-		close(errorChan)
 		if err := recover(); err != nil {
 			util.ErrLog.Printf("panic on workerJoiner: %v", err)
 		}
+		_ = sem.Acquire(context.Background(), int64(c.workerSize))
+		close(errorChan)
 	}()
 
 	workerCloser := func() {
-		sem.Release(1)
 		if err := recover(); err != nil {
 			util.ErrLog.Printf("panic on worker: %v", err)
 		}
+		sem.Release(1)
 	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			// 종료시 남은 항목은 무시한다.
-			return
-		case entry, ok := <-entryRecvChan:
-			if !ok {
-				return
-			}
-			_ = sem.Acquire(ctx, 1)
+	for entry := range entryRecvChan {
+		if err := sem.Acquire(ctx, 1); err == nil {
 			go c.submit(ctx, workerCloser, entry, errorChan)
+		} else {
+			return
 		}
 	}
 }

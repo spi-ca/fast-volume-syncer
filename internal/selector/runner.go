@@ -3,6 +3,7 @@ package selector
 import (
 	"context"
 	"encoding/csv"
+	"errors"
 	"io"
 	"os"
 	"strconv"
@@ -40,7 +41,14 @@ func (r *Runner) Execute(ctx context.Context) error {
 		invoker:    &r.Template,
 	}
 
-	return joiner.Execute(ctx, entryChan)
+	selectorErrorChan := joiner.Execute(ctx, entryChan)
+
+	var errs []error
+
+	for selectorErr := range selectorErrorChan {
+		errs = append(errs, selectorErr)
+	}
+	return errors.Join(errs...)
 }
 
 func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryChan chan<- copyEntry) {

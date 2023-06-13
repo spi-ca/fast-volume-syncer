@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
@@ -51,8 +50,8 @@ func (r *Runner) Execute(ctx context.Context) error {
 	util.InfoLog.Printf("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
 
 	if !r.Common.ReportDisabled {
-		r.logVolumeInfo(ctx, srcPath)
-		r.logVolumeInfo(ctx, dstPath)
+		r.logVolumeInfo(srcPath)
+		r.logVolumeInfo(dstPath)
 	}
 
 	util.InfoLog.Print("=> split rsync")
@@ -77,44 +76,28 @@ func (r *Runner) Execute(ctx context.Context) error {
 
 	entryChan, scannerErrorChan := scanner.Scan(ctx, srcPath)
 	joinerErrorChan := joiner.Execute(ctx, entryChan)
-	err = r.mergeErrorChans(scannerErrorChan, joinerErrorChan)
+
+	var errs []error
+
+	for joinerErr := range joinerErrorChan {
+		errs = append(errs, joinerErr)
+	}
+
+	if scannerErr, ok := <-scannerErrorChan; ok {
+		errs = append(errs, scannerErr)
+	}
+	err = errors.Join(errs...)
 
 	if !r.Common.ReportDisabled {
-		r.logVolumeInfo(ctx, srcPath)
-		r.logVolumeInfo(ctx, dstPath)
+		r.logVolumeInfo(srcPath)
+		r.logVolumeInfo(dstPath)
 	}
+
 	if err == nil && ctx.Err() == nil {
 		util.InfoLog.Printf("volume sync complete! (%s->%s)", srcPath, dstPath)
 	}
 	return err
 
-}
-
-func (r *Runner) mergeErrorChans(in ...<-chan error) error {
-	var wg sync.WaitGroup
-	out := make(chan error, len(in))
-	output := func(c <-chan error) {
-		defer wg.Done()
-		for err := range c {
-			out <- err
-		}
-	}
-
-	wg.Add(len(in))
-	for _, c := range in {
-		go output(c)
-	}
-
-	go func() {
-		defer close(out)
-		wg.Wait()
-	}()
-
-	var errs []error
-	for err := range out {
-		errs = append(errs, err)
-	}
-	return errors.Join(errs...)
 }
 
 func (r *Runner) logLineByLine(reader io.Reader, prefix string) {
@@ -125,22 +108,22 @@ func (r *Runner) logLineByLine(reader io.Reader, prefix string) {
 	}
 }
 
-func (r *Runner) logVolumeInfo(ctx context.Context, path string) {
-	if out, err := exec.CommandContext(ctx, "ls", "-al", path).CombinedOutput(); err != nil {
+func (r *Runner) logVolumeInfo(path string) {
+	if out, err := exec.Command("ls", "-al", path).CombinedOutput(); err != nil {
 		util.ErrLog.Printf("failed to start executable(ls): %v", err)
 	} else {
 		util.InfoLog.Printf("directory_info(%s)=>", path)
 		r.logLineByLine(bytes.NewReader(out), "\t")
 	}
 
-	if out, err := exec.CommandContext(ctx, "findmnt", "-T", path).CombinedOutput(); err != nil {
+	if out, err := exec.Command("findmnt", "-T", path).CombinedOutput(); err != nil {
 		util.ErrLog.Printf("failed to start executable(findmnt): %v", err)
 	} else {
 		util.InfoLog.Printf("mount_info(%s)=>", path)
 		r.logLineByLine(bytes.NewReader(out), "\t")
 	}
 
-	if out, err := exec.CommandContext(ctx, "df", "-h", path).CombinedOutput(); err != nil {
+	if out, err := exec.Command("df", "-h", path).CombinedOutput(); err != nil {
 		util.ErrLog.Printf("failed to start executable(df): %v", err)
 	} else {
 		util.InfoLog.Printf("fs            =>\t")

@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -61,8 +60,6 @@ func (i *Daemonizer) openLogFile() (*os.File, error) {
 }
 
 func (i *Daemonizer) Execute() error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 
 	logFile, err := i.openLogFile()
 	if err != nil {

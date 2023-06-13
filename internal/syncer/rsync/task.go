@@ -11,8 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode"
@@ -49,8 +49,8 @@ func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
 	return retry.Do(retryFunc, retryOptionArgs...)
 }
 
-func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}, fileList []returns.Fileinfo) {
-	defer close(closeChan)
+func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList []returns.Fileinfo) {
+	defer closer()
 	if writer == nil {
 		return
 	}
@@ -100,24 +100,52 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 			}
 		} else if mode.Type()&fs.ModeSymlink != 0 {
 			linkPath := filepath.Join(t.DestinationPath, entry.Path)
-			if err := os.RemoveAll(linkPath); err != nil {
-				util.ErrLog.Printf("failed to cleanup path %s :%v", linkPath, err)
-			} else if err = os.Symlink(entry.SymlinkPath, linkPath); err == nil {
-				continue
+
+			if destMode, err := os.Lstat(linkPath); err == nil {
+				if destMode.Mode().Type()&fs.ModeSymlink != 0 {
+					// 대상 path가 symlink mode가 아닌 경우 대상을 날린다.
+					destLinkPath, readLinkErr := os.Readlink(linkPath)
+					if readLinkErr == nil && destLinkPath == entry.SymlinkPath {
+						continue
+					}
+				}
+
+				if err = os.RemoveAll(linkPath); err != nil {
+					util.ErrLog.Printf("failed to cleanup path %s :%v", linkPath, err)
+					continue
+				}
 			} else if !os.IsNotExist(err) {
-				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s) :%v", linkPath, entry.SymlinkPath, err)
+				util.ErrLog.Printf("failed to create symlink %s, cannot get filestat :%v", linkPath, err)
 				continue
 			}
 
 			// directory보다 링크가 먼저 온 case
 			dirPath := filepath.Dir(linkPath)
-			if err := os.MkdirAll(dirPath, 0o755); err != nil {
+			if destMode, err := os.Lstat(dirPath); err == nil {
+				if !destMode.IsDir() {
+					// 대상 path가 directory mode가 아닌 경우 대상을 날린다.
+					if err = os.RemoveAll(dirPath); err != nil {
+						util.ErrLog.Printf("failed to make a symbolic link(%s -> %s), failed to cleanup path %s :%v",
+							linkPath, entry.SymlinkPath, dirPath, err)
+						continue
+					}
+				}
+			} else if !os.IsNotExist(err) {
+				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s), failed to get fileinfo %s :%v",
+					linkPath, entry.SymlinkPath, dirPath, err)
+				continue
+			} else if err = os.MkdirAll(dirPath, 0o755); err != nil {
 				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s), failed to create directory %s :%v",
 					linkPath, entry.SymlinkPath,
 					dirPath, err,
 				)
-			} else if err = os.Symlink(entry.SymlinkPath, linkPath); err != nil {
+			}
+
+			if err := os.Symlink(entry.SymlinkPath, linkPath); err == nil {
+				continue
+			} else {
 				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s) :%v", linkPath, entry.SymlinkPath, err)
+				continue
 			}
 
 		} else if mode.IsRegular() {
@@ -135,8 +163,8 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closeChan chan<- struct{}
 
 }
 
-func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []returns.Fileinfo, closeChan chan struct{}) {
-	defer close(closeChan)
+func (t *Task) handleRsyncStdout(res *result, reader io.Reader, closer func(), fileList []returns.Fileinfo) {
+	defer closer()
 
 	prefix := fmt.Sprintf("[%d]&1> ", res.pid)
 	scanner := bufio.NewScanner(reader)
@@ -214,8 +242,8 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []retur
 	}
 }
 
-func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closeChan chan<- struct{}) {
-	defer close(closeChan)
+func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closer func()) {
+	defer closer()
 	prefix := fmt.Sprintf("[%d]&2> ", res.pid)
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -226,8 +254,6 @@ func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closeChan chan<-
 }
 
 func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinfo) error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -254,29 +280,21 @@ func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinf
 	}
 	res := &result{total: len(fileList), started: time.Now(), pid: invoke.Process.Pid}
 
-	stdinClosed := make(chan struct{})
-	go t.handleRsyncStdin(stdin, stdinClosed, fileList)
+	go func() {
+		select {
+		case <-parentContext.Done():
+			_ = invoke.Process.Signal(syscall.SIGTERM)
+		case <-ctx.Done():
+		}
+	}()
 
-	stdoutClosed := make(chan struct{})
-	go t.handleRsyncStdout(res, stdout, fileList, stdoutClosed)
-
-	stderrClosed := make(chan struct{})
-	go t.handleRsyncStderr(res, stderr, stderrClosed)
-
-	<-stdinClosed
-
-	select {
-	case <-stdoutClosed:
-		<-stderrClosed
-	case <-stderrClosed:
-		<-stdoutClosed
-	case <-parentContext.Done():
-		_ = syscall.Kill(res.pid, syscall.SIGTERM)
-		<-stdoutClosed
-		<-stderrClosed
-	}
-
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
+	go t.handleRsyncStdin(stdin, wg.Done, fileList)
+	go t.handleRsyncStdout(res, stdout, wg.Done, fileList)
+	go t.handleRsyncStderr(res, stderr, wg.Done)
 	res.err = invoke.Wait()
+	wg.Wait()
 	util.InfoLog.Print(res)
 	return res.HandleError()
 }

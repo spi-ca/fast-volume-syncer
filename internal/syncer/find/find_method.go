@@ -10,8 +10,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode"
@@ -85,8 +85,8 @@ func (s *Scanner) parseFindEntry(line []byte) (*returns.Fileinfo, error) {
 	}
 }
 
-func (s *Scanner) handleFindStderr(res *returns.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
-	defer close(closeChan)
+func (s *Scanner) handleFindStderr(res *returns.ExecutionResult, reader io.Reader, closer func()) {
+	defer closer()
 	prefix := fmt.Sprintf("[%d]&2> ", res.PID)
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -96,14 +96,11 @@ func (s *Scanner) handleFindStderr(res *returns.ExecutionResult, reader io.Reade
 	}
 }
 
-func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reader, closeChan chan<- struct{}, rowChan chan<- returns.Fileinfo, root string) {
-	defer func() {
-		close(rowChan)
-		close(closeChan)
-	}()
-
+func (s *Scanner) handleFindStdout(ctx context.Context, res *returns.ExecutionResult, reader io.Reader, closer func(), rowChan chan<- returns.Fileinfo, root string) {
+	defer closer()
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(util.ScanLineFeed)
+
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
@@ -122,17 +119,15 @@ func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reade
 		}
 		entry.Path = relPath
 
-		rowChan <- *entry
+		select {
+		case <-ctx.Done():
+			return
+		case rowChan <- *entry:
+		}
 	}
 }
 
-func (s *Scanner) executeFind(parentContext context.Context, root string, rowChan chan<- returns.Fileinfo) error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) error {
 	invoke := exec.CommandContext(
 		ctx,
 		s.FinderBinaryPath,
@@ -155,30 +150,16 @@ func (s *Scanner) executeFind(parentContext context.Context, root string, rowCha
 		return fmt.Errorf("failed to start process(find): %w", err)
 	}
 	started := time.Now()
+
 	res := &returns.ExecutionResult{PID: invoke.Process.Pid}
-
-	stdoutClosed := make(chan struct{})
-	go s.handleFindStdout(res, stdout, stdoutClosed, rowChan, root)
-
-	stderrClosed := make(chan struct{})
-	go s.handleFindStderr(res, stderr, stderrClosed)
-
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	go s.handleFindStdout(ctx, res, stdout, wg.Done, rowChan, root)
+	go s.handleFindStderr(res, stderr, wg.Done)
 	util.InfoLog.Printf("find started(%d)", res.PID)
-
-	select {
-	case <-stdoutClosed:
-		<-stderrClosed
-	case <-stderrClosed:
-		<-stdoutClosed
-	case <-parentContext.Done():
-		_ = syscall.Kill(res.PID, syscall.SIGTERM)
-		<-stdoutClosed
-		<-stderrClosed
-	}
-
 	res.Err = invoke.Wait()
 	ended := time.Now()
-
+	wg.Wait()
 	util.InfoLog.Printf("find(%d) ended in %s", &res, ended.Sub(started))
 	return res.HandleError()
 }

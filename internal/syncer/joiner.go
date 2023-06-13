@@ -89,9 +89,9 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 			if err := sem.Acquire(ctx, 1); err == nil {
 				go c.submit(ctx, taskCloser, chunk, errorChan)
 			} else {
+				chunkPool.Put(chunk[0:0])
 				ended = true
 			}
-			chunkPool.Put(chunk[0:0])
 			chunk = nil
 		}
 	}

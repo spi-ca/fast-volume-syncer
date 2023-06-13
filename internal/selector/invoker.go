@@ -7,9 +7,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"unicode"
 
@@ -21,13 +21,10 @@ import (
 
 type Invoker struct {
 	SandboxDisabled bool
-
-	Common args.SyncerCommonArguments
+	Common          args.SyncerCommonArguments
 }
 
 func (i *Invoker) Run(parentContext context.Context, entry copyEntry) error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -49,23 +46,20 @@ func (i *Invoker) Run(parentContext context.Context, entry copyEntry) error {
 
 	res := &returns.ExecutionResult{PID: invoke.Process.Pid}
 
-	stdoutClosed := make(chan struct{})
-	go i.handleStdout(res, stdout, stdoutClosed)
+	go func() {
+		select {
+		case <-parentContext.Done():
+			_ = invoke.Process.Signal(syscall.SIGTERM)
+		case <-ctx.Done():
+		}
+	}()
 
-	stderrClosed := make(chan struct{})
-	go i.handleStderr(res, stderr, stderrClosed)
-
-	select {
-	case <-stdoutClosed:
-		<-stderrClosed
-	case <-stderrClosed:
-		<-stdoutClosed
-	case <-parentContext.Done():
-		_ = syscall.Kill(res.PID, syscall.SIGTERM)
-		<-stdoutClosed
-		<-stderrClosed
-	}
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	go i.handleStdout(res, stdout, wg.Done)
+	go i.handleStderr(res, stderr, wg.Done)
 	res.Err = invoke.Wait()
+	wg.Wait()
 
 	return res.HandleError()
 }
@@ -87,8 +81,8 @@ func (i *Invoker) assembleEnvironment(inherited []string) []string {
 	return inherited
 }
 
-func (i *Invoker) handleStdout(res *returns.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
-	defer close(closeChan)
+func (i *Invoker) handleStdout(res *returns.ExecutionResult, reader io.Reader, closer func()) {
+	defer closer()
 	prefix := fmt.Sprintf("[%d]&1> ", res.PID)
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -97,8 +91,8 @@ func (i *Invoker) handleStdout(res *returns.ExecutionResult, reader io.Reader, c
 	}
 }
 
-func (i *Invoker) handleStderr(res *returns.ExecutionResult, reader io.Reader, closeChan chan<- struct{}) {
-	defer close(closeChan)
+func (i *Invoker) handleStderr(res *returns.ExecutionResult, reader io.Reader, closer func()) {
+	defer closer()
 	prefix := fmt.Sprintf("[%d]&2> ", res.PID)
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {

@@ -25,6 +25,7 @@ func (s *Scanner) execute(ctx context.Context, root string, entryChan chan<- ret
 		if err := recover(); err != nil {
 			util.ErrLog.Printf("panic on Scanner.Scan : %v", err)
 		}
+		close(entryChan)
 		close(errorChan)
 	}()
 
