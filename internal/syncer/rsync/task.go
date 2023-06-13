@@ -140,6 +140,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, fileList []retur
 
 	prefix := fmt.Sprintf("[%d]&1> ", res.pid)
 	scanner := bufio.NewScanner(reader)
+	scanner.Split(util.ScanLineFeed)
 
 	if len(fileList) == 0 {
 		for scanner.Scan() {

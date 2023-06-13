@@ -103,6 +103,7 @@ func (s *Scanner) handleFindStdout(res *returns.ExecutionResult, reader io.Reade
 	}()
 
 	scanner := bufio.NewScanner(reader)
+	scanner.Split(util.ScanLineFeed)
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {

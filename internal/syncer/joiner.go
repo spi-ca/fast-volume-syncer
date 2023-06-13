@@ -61,6 +61,7 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 			ended = true
 			if chunk != nil {
 				chunkPool.Put(chunk[0:0])
+				chunk = nil
 			}
 			continue
 		case entry, ok := <-entryRecvChan:
@@ -87,7 +88,10 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 			// context문제가 있을때만 error 발생.
 			if err := sem.Acquire(ctx, 1); err == nil {
 				go c.submit(ctx, taskCloser, chunk, errorChan)
+			} else {
+				ended = true
 			}
+			chunkPool.Put(chunk[0:0])
 			chunk = nil
 		}
 	}
