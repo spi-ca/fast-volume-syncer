@@ -65,21 +65,26 @@ func (r *Runner) Execute(ctx context.Context) error {
 	}
 
 	joiner := chunkJoiner{
-		invoker: rsync.Task{
+		taskSize:     r.Common.TaskSize,
+		chunkSize:    r.Common.ChunkSize,
+		scanDuration: r.Common.ScanDuration,
+	}
+
+	if r.Common.UseRsync {
+		copyMethodHandler := rsync.Task{
 			Arguments:       r.Common.Args.Assemble(srcPath, dstPath),
 			Retry:           r.Common.Retry,
 			SourcePath:      srcPath,
 			DestinationPath: dstPath,
-		},
-		useCopier: r.Common.UseCopier,
-		copier: copier.Copier{
+		}
+		joiner.copier = copyMethodHandler.Execute
+	} else {
+		copyMethodHandler := copier.Copier{
 			SourceRoot:      srcPath,
 			DestinationRoot: dstPath,
 			Umask:           0o600,
-		},
-		taskSize:     r.Common.TaskSize,
-		chunkSize:    r.Common.ChunkSize,
-		scanDuration: r.Common.ScanDuration,
+		}
+		joiner.copier = copyMethodHandler.Execute
 	}
 
 	entryChan, scannerErrorChan := scanner.Scan(ctx, srcPath)

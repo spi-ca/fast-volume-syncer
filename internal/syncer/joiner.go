@@ -6,24 +6,22 @@ import (
 	"sync"
 	"time"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/copier"
-
 	"golang.org/x/sync/semaphore"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/rsync"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
-type chunkJoiner struct {
-	taskSize  int
-	chunkSize int
+type (
+	copyMethod  func(context.Context, []returns.Fileinfo) error
+	chunkJoiner struct {
+		taskSize  int
+		chunkSize int
 
-	useCopier    bool
-	invoker      rsync.Task
-	copier       copier.Copier
-	scanDuration time.Duration
-}
+		copier       copyMethod
+		scanDuration time.Duration
+	}
+)
 
 func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.Fileinfo) <-chan error {
 	errorChan := make(chan error, c.taskSize)
@@ -103,13 +101,7 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 
 func (c *chunkJoiner) submit(ctx context.Context, closer func([]returns.Fileinfo), chunk []returns.Fileinfo, errorChan chan<- error) {
 	defer closer(chunk)
-	var processor func(context.Context, []returns.Fileinfo) error
-	if c.useCopier {
-		processor = c.copier.Execute
-	} else {
-		processor = c.invoker.Execute
-	}
-	err := processor(ctx, chunk)
+	err := c.copier(ctx, chunk)
 	if err != nil {
 		errorChan <- fmt.Errorf("chunk processing failed : %w", err)
 	}
