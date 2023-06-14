@@ -83,6 +83,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 			SourceRoot:      srcPath,
 			DestinationRoot: dstPath,
 			Umask:           0o600,
+			Retry:           r.Common.Retry,
 		}
 		joiner.copier = copyMethodHandler.Execute
 	}

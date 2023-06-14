@@ -17,6 +17,7 @@ type result struct {
 	total         int
 	sent          int
 	uptodate      int
+	disappeared   int
 	skipped       int
 	sentBytes     int64
 	started       time.Time
@@ -62,8 +63,8 @@ func (r *result) String() string {
 		buf.WriteString(util.FileSizeIEC(r.sentBytes))
 	}
 	if r.total > 0 {
-		_, _ = fmt.Fprintf(buf, " total(%d) = sent(%d) + uptodate(%d) + skipped(%d) + untouched(%d),",
-			r.total, r.sent, r.uptodate, r.skipped, r.total-r.sent-r.uptodate-r.skipped,
+		_, _ = fmt.Fprintf(buf, " total(%d) = sent(%d) + uptodate(%d) + disappeared(%d) + skipped(%d) + untouched(%d),",
+			r.total, r.sent, r.uptodate, r.disappeared, r.skipped, r.total-r.sent-r.uptodate-r.disappeared-r.skipped,
 		)
 	}
 	if len(r.errs) > 0 {
