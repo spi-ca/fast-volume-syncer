@@ -86,11 +86,11 @@ func (t *Copier) copyNewFile(opIdx uint64, srcPath, dstPath string, mode os.File
 			cause:   fmt.Errorf("failed to create a tempfile :%w; %w", ErrCopierCopyFailed, err),
 		}
 	}
-	defer tmp.Close()
 
 	tmpPath := tmp.Name()
 	copied, err := io.Copy(tmp, src)
 	if err != nil {
+		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 		return 0, &copierError{
 			srcPath: srcPath,
@@ -101,6 +101,7 @@ func (t *Copier) copyNewFile(opIdx uint64, srcPath, dstPath string, mode os.File
 
 	err = os.Rename(tmpPath, dstPath)
 	if err != nil {
+		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 		return 0, &copierError{
 			srcPath: srcPath,
@@ -108,6 +109,7 @@ func (t *Copier) copyNewFile(opIdx uint64, srcPath, dstPath string, mode os.File
 			cause:   fmt.Errorf("failed to rename a file :%w; %w", ErrCopierCopyFailed, err),
 		}
 	}
+	_ = tmp.Close()
 
 	err = os.Chmod(dstPath, mode)
 	if err != nil {
@@ -169,11 +171,11 @@ func (t *Copier) copyExistingFile(opIdx uint64, srcPath, dstPath string, mode os
 			cause:   fmt.Errorf("failed to create a tempfile :%w; %w", ErrCopierCopyFailed, err),
 		}
 	}
-	defer tmp.Close()
 
 	tmpPath := tmp.Name()
 	copied, err := io.Copy(tmp, src)
 	if err != nil {
+		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 		return 0, &copierError{
 			srcPath: srcPath,
@@ -184,6 +186,7 @@ func (t *Copier) copyExistingFile(opIdx uint64, srcPath, dstPath string, mode os
 
 	err = os.Remove(dstPath)
 	if err != nil {
+		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 		return 0, &copierError{
 			srcPath: srcPath,
@@ -194,6 +197,7 @@ func (t *Copier) copyExistingFile(opIdx uint64, srcPath, dstPath string, mode os
 
 	err = os.Rename(tmpPath, dstPath)
 	if err != nil {
+		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 		return 0, &copierError{
 			srcPath: srcPath,
@@ -201,6 +205,7 @@ func (t *Copier) copyExistingFile(opIdx uint64, srcPath, dstPath string, mode os
 			cause:   fmt.Errorf("failed to rename a file :%w; %w", ErrCopierCopyFailed, err),
 		}
 	}
+	_ = tmp.Close()
 
 	err = os.Chmod(dstPath, mode)
 	if err != nil {
