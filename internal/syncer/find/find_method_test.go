@@ -80,19 +80,6 @@ func TestScanner_parseFindEntry(t1 *testing.T) {
 	}
 }
 
-func TestScanner_scanDirectory(t1 *testing.T) {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	s := &Scanner{}
-	infoChan := make(chan returns.Fileinfo)
-	go s.scanDirectory(ctx, ".", infoChan)
-	for entry := range infoChan {
-		log.Printf("entry %v", entry)
-	}
-	log.Printf("ended ")
-}
-
 func TestScanner_executeFindCommand(t1 *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())

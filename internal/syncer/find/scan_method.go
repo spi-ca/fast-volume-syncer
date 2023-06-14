@@ -31,6 +31,10 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 			return filepath.SkipDir
 		}
 
+		if s.ignoreFilename(relPath) {
+			return nil
+		}
+
 		entry := returns.Fileinfo{
 			Path: relPath,
 			Mode: info.Mode(),
@@ -40,8 +44,8 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 			entry.SymlinkPath, err = os.Readlink(path)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to execute readlink file(%s) info: %w", path, err))
+				return nil
 			}
-			return nil
 		}
 		select {
 		case rowChan <- entry:

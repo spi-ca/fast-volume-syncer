@@ -1,6 +1,7 @@
 package syncer
 
 import (
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/copier"
 	"bufio"
 	"bytes"
 	"context"
@@ -68,6 +69,12 @@ func (r *Runner) Execute(ctx context.Context) error {
 			Retry:           r.Common.Retry,
 			SourcePath:      srcPath,
 			DestinationPath: dstPath,
+		},
+		useCopier: r.Common.UseCopier,
+		copier: copier.Copier{
+			SourceRoot:      srcPath,
+			DestinationRoot: dstPath,
+			Umask:           0o700,
 		},
 		taskSize:     r.Common.TaskSize,
 		chunkSize:    r.Common.ChunkSize,

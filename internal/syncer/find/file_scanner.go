@@ -3,6 +3,7 @@ package find
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
@@ -18,6 +19,13 @@ func (s *Scanner) Scan(ctx context.Context, root string) (<-chan returns.Fileinf
 	errorChan := make(chan error, 1)
 	go s.execute(ctx, root, entryChan, errorChan)
 	return entryChan, errorChan
+}
+
+func (s *Scanner) ignoreFilename(path string) bool {
+	filename := filepath.Base(path)
+	// 자기자신은 무시하자
+	ignored, ok := ignoreFilename[filename]
+	return ok && ignored
 }
 
 func (s *Scanner) execute(ctx context.Context, root string, entryChan chan<- returns.Fileinfo, errorChan chan<- error) {

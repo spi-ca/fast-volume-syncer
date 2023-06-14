@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/avast/retry-go v3.0.0+incompatible
+	github.com/djherbis/times v1.5.0
 	github.com/moby/sys/mount v0.3.3
 	github.com/schollz/progressbar/v3 v3.13.1
 	github.com/slack-go/slack v0.12.2

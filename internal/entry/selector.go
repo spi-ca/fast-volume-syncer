@@ -42,6 +42,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 	util.InfoLog.Print("	report.disabled=", viper.GetBool("report.disabled"))
 	util.InfoLog.Print("	sandbox.disabled=", viper.GetString("sandbox.disabled"))
 	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
+	util.InfoLog.Print("	copier.enabled=", viper.GetBool("copier.enabled"))
 	util.InfoLog.Print("	rsync.verbose=", viper.GetBool("rsync.verbose"))
 	util.InfoLog.Print("	rsync.delete=", viper.GetBool("rsync.delete"))
 	util.InfoLog.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
@@ -105,6 +106,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 			Common: args.SyncerCommonArguments{
 				ReportDisabled:     viper.GetBool("report.disabled"),
 				SandboxMountOption: viper.GetString("sandbox.mount.option"),
+				UseCopier:          viper.GetBool("copier.enabled"),
 				Args: args.RsyncArgs{
 					Verbose:            viper.GetBool("rsync.verbose"),
 					Delete:             viper.GetBool("rsync.delete"),

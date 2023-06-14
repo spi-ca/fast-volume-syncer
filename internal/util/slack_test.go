@@ -1,7 +1,6 @@
 package util
 
 import (
-	"context"
 	"io"
 	"log"
 	"os"
@@ -9,7 +8,7 @@ import (
 )
 
 func TestSendSlackMessage(t *testing.T) {
-	SlackSender.Start(context.Background())
+	SlackSender.Start()
 	defer SlackSender.Close()
 	prevWriter := ErrLog.Writer()
 	defer func() {
