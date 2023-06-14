@@ -11,6 +11,7 @@ import (
 )
 
 type result struct {
+	opIdx         uint64
 	startIdx      int
 	lastFilenames [10]string
 	total         int
@@ -41,7 +42,7 @@ func (r *result) listFilename() []string {
 func (r *result) String() string {
 	buf := &strings.Builder{}
 
-	_, _ = fmt.Fprintf(buf, "Copier")
+	_, _ = fmt.Fprintf(buf, "[Copier op:%d]", r.opIdx)
 
 	if !r.started.IsZero() {
 		elapsed := time.Now().Sub(r.started)
@@ -113,7 +114,7 @@ func (r *result) HandleError() error {
 
 	err := errors.Join(r.errs...)
 	if err != nil {
-		return fmt.Errorf("%w %s", err, buf.String())
+		return fmt.Errorf("[Copier op:%d]%w %s", r.opIdx, err, buf.String())
 	} else {
 		return nil
 	}
