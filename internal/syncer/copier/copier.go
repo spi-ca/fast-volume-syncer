@@ -161,7 +161,7 @@ func (t *Copier) copyFile(parentCtx context.Context, opIdx uint64, srcPath, dstP
 
 	if removeDst {
 		err = os.RemoveAll(dstPath)
-		if err == nil {
+		if err != nil {
 			_ = os.Remove(tmpPath)
 			return 0, &copierError{
 				srcPath: srcPath,
@@ -296,7 +296,7 @@ func (t *Copier) processDirectory(opIdx uint64, srcPath string, dstPath string, 
 		if destExists = destMode.IsDir(); !destExists {
 			// 대상 path가 directory mode가 아닌 경우 대상을 날린다.
 			err = os.RemoveAll(dstPath)
-			if err == nil {
+			if err != nil {
 				return &copierError{
 					srcPath: srcPath,
 					dstPath: dstPath,
