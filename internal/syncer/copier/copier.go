@@ -454,7 +454,7 @@ func (t *Copier) execute(ctx context.Context, fileList []returns.Fileinfo) error
 		progressbar.OptionSetPredictTime(false),
 		progressbar.OptionThrottle(time.Second),
 		progressbar.OptionSetItsString("op"),
-		progressbar.OptionSetDescription(fmt.Sprintf("[Copier op:%d]", opIdx)),
+		progressbar.OptionSetDescription(fmt.Sprintf("[Copier op:%d]\t", opIdx)),
 		progressbar.OptionSetTheme(progressbar.Theme{
 			Saucer:        "-",
 			SaucerHead:    ">",
