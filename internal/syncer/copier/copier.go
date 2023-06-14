@@ -22,6 +22,7 @@ import (
 
 const (
 	COMPARE_EQUAL int = iota
+	COMPARE_SRC_NOT_EXIST
 	COMPARE_DST_NOT_EXIST
 	COMPARE_DIFFER
 	COMPARE_DST_IS_NEWER
@@ -76,6 +77,23 @@ func (t *Copier) copyNewFile(opIdx uint64, srcPath, dstPath string, mode os.File
 			cause:   fmt.Errorf("failed to open source file: %w; %w", ErrCopierCopyFailed, err),
 		}
 	}
+
+	tm, err := times.StatFile(src)
+	if err == nil {
+		// do nothing
+	} else if os.IsNotExist(err) {
+		return 0, &copierError{
+			srcPath: srcPath,
+			dstPath: dstPath,
+			cause:   errors.Join(ErrCopierSrcNotExist, err),
+		}
+	} else {
+		return 0, &copierError{
+			srcPath: srcPath,
+			dstPath: dstPath,
+			cause:   fmt.Errorf("failed to get the source fileinfo :%w; %w", ErrCopierCopyFailed, err),
+		}
+	}
 	defer src.Close()
 
 	tmp, err := os.CreateTemp(dstDir, fmt.Sprintf(".tmp-%x-%d", int64(os.Getpid())^time.Now().Unix(), opIdx))
@@ -89,7 +107,15 @@ func (t *Copier) copyNewFile(opIdx uint64, srcPath, dstPath string, mode os.File
 
 	tmpPath := tmp.Name()
 	copied, err := io.Copy(tmp, src)
-	if err != nil {
+	if err == nil {
+		// do nothing
+	} else if os.IsNotExist(err) {
+		return 0, &copierError{
+			srcPath: srcPath,
+			dstPath: dstPath,
+			cause:   errors.Join(ErrCopierSrcNotExist, err),
+		}
+	} else {
 		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 		return 0, &copierError{
@@ -118,16 +144,6 @@ func (t *Copier) copyNewFile(opIdx uint64, srcPath, dstPath string, mode os.File
 			srcPath: srcPath,
 			dstPath: dstPath,
 			cause:   fmt.Errorf("failed to change a filemode :%w; %w", ErrCopierCopyFailed, err),
-		}
-	}
-
-	tm, err := times.StatFile(src)
-	if err != nil {
-		_ = os.Remove(dstPath)
-		return 0, &copierError{
-			srcPath: srcPath,
-			dstPath: dstPath,
-			cause:   fmt.Errorf("failed to get the source fileinfo :%w; %w", ErrCopierCopyFailed, err),
 		}
 	}
 
@@ -161,6 +177,23 @@ func (t *Copier) copyExistingFile(opIdx uint64, srcPath, dstPath string, mode os
 			cause:   fmt.Errorf("failed to open source file: %w; %w", ErrCopierCopyFailed, err),
 		}
 	}
+
+	tm, err := times.StatFile(src)
+	if err == nil {
+		// do nothing
+	} else if os.IsNotExist(err) {
+		return 0, &copierError{
+			srcPath: srcPath,
+			dstPath: dstPath,
+			cause:   errors.Join(ErrCopierSrcNotExist, err),
+		}
+	} else {
+		return 0, &copierError{
+			srcPath: srcPath,
+			dstPath: dstPath,
+			cause:   fmt.Errorf("failed to get the source fileinfo :%w; %w", ErrCopierCopyFailed, err),
+		}
+	}
 	defer src.Close()
 
 	tmp, err := os.CreateTemp(dstDir, fmt.Sprintf(".tmp-%x-%d", int64(os.Getpid())^time.Now().Unix(), opIdx))
@@ -174,7 +207,15 @@ func (t *Copier) copyExistingFile(opIdx uint64, srcPath, dstPath string, mode os
 
 	tmpPath := tmp.Name()
 	copied, err := io.Copy(tmp, src)
-	if err != nil {
+	if err == nil {
+		// do nothing
+	} else if os.IsNotExist(err) {
+		return 0, &copierError{
+			srcPath: srcPath,
+			dstPath: dstPath,
+			cause:   errors.Join(ErrCopierSrcNotExist, err),
+		}
+	} else {
 		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 		return 0, &copierError{
@@ -217,16 +258,6 @@ func (t *Copier) copyExistingFile(opIdx uint64, srcPath, dstPath string, mode os
 		}
 	}
 
-	tm, err := times.StatFile(src)
-	if err != nil {
-		_ = os.Remove(dstPath)
-		return 0, &copierError{
-			srcPath: srcPath,
-			dstPath: dstPath,
-			cause:   fmt.Errorf("failed to get the source fileinfo :%w; %w", ErrCopierCopyFailed, err),
-		}
-	}
-
 	err = os.Chtimes(dstPath, tm.AccessTime(), tm.ModTime())
 	if err != nil {
 		_ = os.Remove(dstPath)
@@ -255,7 +286,11 @@ func (t *Copier) compareFile(opIdx uint64, srcPath string, dstPath string, srcSi
 	}
 
 	srcTm, err := times.Lstat(srcPath)
-	if err != nil {
+	if err == nil {
+		// do nothing
+	} else if os.IsNotExist(err) {
+		return COMPARE_SRC_NOT_EXIST, nil
+	} else {
 		return 0, &copierError{
 			srcPath: srcPath,
 			dstPath: dstPath,
@@ -294,6 +329,13 @@ func (t *Copier) copyRegularFile(opIdx uint64, srcPath string, dstPath string, s
 			srcPath: srcPath,
 			dstPath: dstPath,
 			cause:   ErrCopierUptodate,
+		}
+	case COMPARE_SRC_NOT_EXIST:
+		// source file disappears..
+		return 0, &copierError{
+			srcPath: srcPath,
+			dstPath: dstPath,
+			cause:   errors.Join(ErrCopierSrcNotExist, err),
 		}
 	case COMPARE_DIFFER:
 		return t.copyExistingFile(opIdx, srcPath, dstPath, dstMode)
