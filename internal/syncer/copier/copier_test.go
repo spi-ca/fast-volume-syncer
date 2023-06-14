@@ -1,11 +1,12 @@
 package copier
 
 import (
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"context"
 	"log"
 	"path/filepath"
 	"testing"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/find"
 )
@@ -24,7 +25,7 @@ func TestCopier_copyNewFile(t1 *testing.T) {
 	t := &Copier{
 		SourceRoot:      src,
 		DestinationRoot: dest,
-		Umask:           0o770,
+		Umask:           0o640,
 	}
 	files := []returns.Fileinfo{}
 	for entry := range infoChan {

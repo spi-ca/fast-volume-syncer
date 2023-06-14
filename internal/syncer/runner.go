@@ -1,7 +1,6 @@
 package syncer
 
 import (
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/copier"
 	"bufio"
 	"bytes"
 	"context"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/copier"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
@@ -74,7 +75,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 		copier: copier.Copier{
 			SourceRoot:      srcPath,
 			DestinationRoot: dstPath,
-			Umask:           0o700,
+			Umask:           0o600,
 		},
 		taskSize:     r.Common.TaskSize,
 		chunkSize:    r.Common.ChunkSize,

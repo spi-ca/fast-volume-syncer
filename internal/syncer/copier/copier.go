@@ -436,7 +436,7 @@ func (t *Copier) routeFileByTypes(srcInfo returns.Fileinfo) (int64, error) {
 	dstPath := filepath.Join(t.DestinationRoot, srcInfo.Path)
 
 	if srcMode.IsDir() {
-		return 0, t.processDirectory(srcPath, dstPath, dstMode)
+		return 0, t.processDirectory(srcPath, dstPath, dstMode|0o100)
 	} else if srcMode.Type()&fs.ModeSymlink != 0 {
 		return 0, t.processSymbolicLink(srcPath, dstPath, srcInfo.SymlinkPath)
 	} else if srcMode.IsRegular() {
