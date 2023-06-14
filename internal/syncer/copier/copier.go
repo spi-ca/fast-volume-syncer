@@ -473,6 +473,8 @@ forLoop:
 		if err == nil {
 			res.sent++
 		} else if errors.Is(err, context.Canceled) {
+			err = nil
+			break forLoop
 		} else if errors.Is(err, ErrCopierUptodate) {
 			res.uptodate++
 		} else if errors.Is(err, ErrCopierSrcNotExist) {
@@ -481,12 +483,6 @@ forLoop:
 			res.skipped++
 		} else {
 			res.errs = append(res.errs, err)
-		}
-
-		select {
-		case <-ctx.Done():
-			break forLoop
-		default:
 		}
 	}
 
