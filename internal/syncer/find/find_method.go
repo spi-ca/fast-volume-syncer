@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	findFormat    = regexp.MustCompile(`^(\d+?)\s+(\d+?)\s+([^\s]+?)\s+(\d+?)\s+(.+?)\s+(.+?)\s+(\d+?)\s+([A-Za-z]+?\s+\d+?\s+\d+?(?::\d+?)?)\s+(.*)$`)
+	findFormat    = regexp.MustCompile(`^(\d+?)\s+(\d+?)\s+(\S+?)\s+(\d+?)\s+(.+?)\s+(.+?)\s+(\d+?)\s+([A-Za-z]+?\s+\d+?\s+\d+?(?::\d+?)?)\s+(.*)$`)
 	symlinkFormat = regexp.MustCompile(`^(.*) -> (.*)$`)
 )
 

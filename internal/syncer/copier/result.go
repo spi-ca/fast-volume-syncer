@@ -11,11 +11,12 @@ import (
 )
 
 type result struct {
-	opIdx         uint64
+	chunkIdx      uint64
 	startIdx      int
 	lastFilenames [10]string
 	total         int
 	sent          int
+	processed     int
 	uptodate      int
 	disappeared   int
 	skipped       int
@@ -43,7 +44,7 @@ func (r *result) listFilename() []string {
 func (r *result) String() string {
 	buf := &strings.Builder{}
 
-	_, _ = fmt.Fprintf(buf, "[Copier op:%d]", r.opIdx)
+	_, _ = fmt.Fprintf(buf, "[chk:%d]", r.chunkIdx)
 
 	if !r.started.IsZero() {
 		elapsed := time.Now().Sub(r.started)
@@ -63,8 +64,8 @@ func (r *result) String() string {
 		buf.WriteString(util.FileSizeIEC(r.sentBytes))
 	}
 	if r.total > 0 {
-		_, _ = fmt.Fprintf(buf, " total(%d) = sent(%d) + uptodate(%d) + disappeared(%d) + skipped(%d) + untouched(%d),",
-			r.total, r.sent, r.uptodate, r.disappeared, r.skipped, r.total-r.sent-r.uptodate-r.disappeared-r.skipped,
+		_, _ = fmt.Fprintf(buf, " total(%d) = sent(%d) + processed(%d) + uptodate(%d) + disappeared(%d) + skipped(%d) + untouched(%d),",
+			r.total, r.sent, r.processed, r.uptodate, r.disappeared, r.skipped, r.total-r.sent-r.processed-r.uptodate-r.disappeared-r.skipped,
 		)
 	}
 	if len(r.errs) > 0 {
@@ -115,7 +116,7 @@ func (r *result) HandleError() error {
 
 	err := errors.Join(r.errs...)
 	if err != nil {
-		return fmt.Errorf("[Copier op:%d]%w %s", r.opIdx, err, buf.String())
+		return fmt.Errorf("[chk:%d]%w %s", r.chunkIdx, err, buf.String())
 	} else {
 		return nil
 	}

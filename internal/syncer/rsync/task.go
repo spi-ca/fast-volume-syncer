@@ -234,7 +234,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, closer func(), f
 			if len(match(2)) == 0 {
 				info := fileList[idx]
 				res.sent++
-				res.sentBytes += info.Size
+				res.sentBytes += info.Size * 1024
 			} else {
 				res.uptodate++
 			}

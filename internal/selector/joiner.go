@@ -54,8 +54,8 @@ func (c *workerJoiner) submit(ctx context.Context, closer func(), entry copyEntr
 	err := c.invoker.Run(ctx, entry)
 	ended := time.Now()
 	if err != nil {
-		errorChan <- fmt.Errorf("copyEntry(%s) failed in %s: %w", entry, ended.Sub(started), err)
+		errorChan <- fmt.Errorf("%s failed in %s: %w", entry, ended.Sub(started), err)
 	} else {
-		util.ErrLog.Printf("copyEntry(%s) completed in %s", entry, ended.Sub(started))
+		util.ErrLog.Printf("%s completed in %s", entry, ended.Sub(started))
 	}
 }
