@@ -23,7 +23,7 @@ func RotateLogs() {
 	rotateLogsInternal(time.Now())
 }
 
-func StartRotateLogMignight(ctx context.Context) {
+func StartRotateLogMidnight(ctx context.Context) {
 	// Position the first execution
 	first, duration := getNextMidnight()
 	offset := first.Sub(time.Now())

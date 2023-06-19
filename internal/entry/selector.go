@@ -94,7 +94,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 			defer closer()
 		}
 
-		go util.StartRotateLogMignight(ctx)
+		go util.StartRotateLogMidnight(ctx)
 		util.ErrLog.Printf(fmt.Sprintf("fast-volume-sync/selector@%d(daemonized:%t) had been initiated", nodeSelector, daemonized))
 	}
 
