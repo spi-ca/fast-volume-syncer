@@ -91,7 +91,7 @@ func rotateLogsInternal(at time.Time) {
 		}
 
 		_ = os.Stderr.Sync()
-		_ = sys.DupFD(newStdErrFd, stderrFd)
+		_ = sys.ReplaceFD(newStdErrFd, stderrFd)
 
 		InfoLog.Printf("log file rotated! previous log saved to %s", savedFilename)
 	} else {
@@ -157,7 +157,7 @@ func rotateFile(filename string, at time.Time, fd int) (string, error) {
 		return "", fmt.Errorf("failed to sync for fd(%d) :%w", fd, err)
 	}
 
-	err = sys.DupFD(newFd, fd)
+	err = sys.ReplaceFD(newFd, fd)
 	if err != nil {
 		_ = os.Rename(rotateFilename, filename)
 		_ = syscall.Close(newFd)

@@ -7,6 +7,6 @@ package sys
 
 import "golang.org/x/sys/unix"
 
-func DupFD(oldfd int, newfd int) (err error) {
+func ReplaceFD(oldfd int, newfd int) (err error) {
 	return unix.Dup2(oldfd, newfd)
 }
