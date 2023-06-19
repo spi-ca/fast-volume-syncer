@@ -3,7 +3,6 @@ package entry
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -36,12 +35,9 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 	}()
 
 	daemonized, _ := strconv.ParseBool(os.Getenv("_FVS_DAEMONEZED"))
-	slackMonitoring, _ := strconv.ParseBool(os.Getenv("_SLACK_MONITORING"))
 
-	//if daemonized {
 	util.InfoLog.SetPrefix("&1>")
 	util.ErrLog.SetPrefix("&2>")
-	//}
 
 	util.InfoLog.Print("args:")
 	util.InfoLog.Print("	report.disabled=", viper.GetBool("report.disabled"))
@@ -76,7 +72,6 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 	util.InfoLog.Print("	daemonized=", daemonized)
 	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
 	util.InfoLog.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
-	util.InfoLog.Print("	env['_SLACK_MONITORING']=", os.Getenv("_SLACK_MONITORING"))
 	util.InfoLog.Print("---")
 
 	if daemonized {
@@ -88,17 +83,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 			}
 			defer closer()
 		}
-		if slackMonitoring {
-			util.SlackSender.SetPrefix(util.ErrLog.Prefix())
-			util.SlackSender.Start()
-			prevWriter := util.ErrLog.Writer()
-			defer func() {
-				util.ErrLog.SetOutput(prevWriter)
-				util.SlackSender.Close()
-			}()
-			util.ErrLog.SetOutput(io.MultiWriter(prevWriter, util.SlackSender))
-			util.ErrLog.Printf(fmt.Sprintf("fast-volume-sync/selector@%d(daemonized:%t) had been initiated", nodeSelector, daemonized))
-		}
+		util.ErrLog.Printf(fmt.Sprintf("fast-volume-sync/selector@%d(daemonized:%t) had been initiated", nodeSelector, daemonized))
 	}
 
 	runner := selector.Runner{

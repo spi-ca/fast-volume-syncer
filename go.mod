@@ -7,8 +7,6 @@ require (
 	github.com/djherbis/times v1.5.0
 	github.com/moby/sys/mount v0.3.3
 	github.com/schollz/progressbar/v3 v3.13.1
-	github.com/slack-go/slack v0.12.2
-	github.com/sony/gobreaker v0.5.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.16.0
 	golang.org/x/sync v0.1.0
@@ -16,7 +14,6 @@ require (
 
 require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
