@@ -287,7 +287,8 @@ func (t *Copier) copyFile(parentCtx context.Context, chunkIdx uint64, srcPath, d
 		return 0, fmt.Errorf("failed to get the source fileinfo :%w; %w", ErrCopierCopyFailed, err)
 	}
 	defer src.Close()
-	if dstExists {
+
+	if !dstExists {
 		if err = t.makeParentsExist(dstPath); err != nil {
 			// 자식이 없다는것은 부모도 없다는의미.
 			return 0, err
