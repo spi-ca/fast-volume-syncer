@@ -67,7 +67,7 @@ func rotateLogsInternal(at time.Time) {
 	stderrFilePath, stderrInfo, stderrErr := sys.PathFromFd(os.Stderr.Fd())
 	if stdoutErr != nil ||
 		stderrErr != nil {
-		ErrLog.Printf("failed to get stdout|stderr fileinfo :%w", errors.Join(stdoutErr, stderrErr))
+		ErrLog.Printf("failed to get stdout|stderr fileinfo :%v", errors.Join(stdoutErr, stderrErr))
 		return
 	} else if !stdoutInfo.Mode().IsRegular() ||
 		!stderrInfo.Mode().IsRegular() {
@@ -84,13 +84,13 @@ func rotateLogsInternal(at time.Time) {
 		}
 		savedFilename, err := rotateFile(stdoutFilePath, at, stdoutFd)
 		if err != nil {
-			ErrLog.Printf("failed to rotate stdout :%w", stdoutFilePath, err)
+			ErrLog.Printf("failed to rotate stdout %s: %v", stdoutFilePath, err)
 			return
 		}
 
 		newStdErrFd, err := syscall.Dup(stdoutFd)
 		if err != nil {
-			ErrLog.Printf("failed to dup for stderr:%v", err)
+			ErrLog.Printf("failed to dup for stderr: %v", err)
 			return
 		}
 
@@ -102,7 +102,7 @@ func rotateLogsInternal(at time.Time) {
 		if pos, _ := syscall.Seek(stdoutFd, 0, io.SeekCurrent); pos == 0 {
 			// do nothing
 		} else if savedFilename, err := rotateFile(stdoutFilePath, at, stdoutFd); err != nil {
-			InfoLog.Printf("failed to rotate stdout :%w", stdoutFilePath, err)
+			InfoLog.Printf("failed to rotate stdout: %v", err)
 		} else {
 			InfoLog.Printf("stdout rotated! previous log saved to %s", savedFilename)
 		}
@@ -110,7 +110,7 @@ func rotateLogsInternal(at time.Time) {
 		if pos, _ := syscall.Seek(stderrFd, 0, io.SeekCurrent); pos == 0 {
 			// do nothing
 		} else if savedFilename, err := rotateFile(stderrFilePath, at, stderrFd); err != nil {
-			ErrLog.Printf("failed to rotate stderr :%w", stderrFilePath, err)
+			ErrLog.Printf("failed to rotate stderr: %v", err)
 		} else {
 			ErrLog.Printf("stderr rotated! previous log saved to %s", savedFilename)
 		}
@@ -125,7 +125,7 @@ func checkLogFile() {
 	stderrFilePath, stderrInfo, stderrErr := sys.PathFromFd(os.Stdout.Fd())
 	if stdoutErr != nil ||
 		stderrErr != nil {
-		ErrLog.Printf("failed to get stdout|stderr fileinfo :%w", errors.Join(stdoutErr, stderrErr))
+		ErrLog.Printf("failed to get stdout|stderr fileinfo: %v", errors.Join(stdoutErr, stderrErr))
 		return
 	} else if !stdoutInfo.Mode().IsRegular() ||
 		!stderrInfo.Mode().IsRegular() {
@@ -151,21 +151,21 @@ func rotateFile(filename string, at time.Time, fd int) (string, error) {
 	newFd, err := syscall.Open(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND|syscall.O_CLOEXEC, 0o644)
 	if err != nil {
 		_ = os.Rename(rotateFilename, filename)
-		return "", fmt.Errorf("failed to rename a file(%s) :%w", filename, err)
+		return "", fmt.Errorf("failed to rename a file(%s): %w", filename, err)
 	}
 
 	err = syscall.Fsync(fd)
 	if err != nil {
 		_ = os.Rename(rotateFilename, filename)
 		_ = syscall.Close(newFd)
-		return "", fmt.Errorf("failed to sync for fd(%d) :%w", fd, err)
+		return "", fmt.Errorf("failed to sync for fd(%d): %w", fd, err)
 	}
 
 	err = sys.ReplaceFD(newFd, fd)
 	if err != nil {
 		_ = os.Rename(rotateFilename, filename)
 		_ = syscall.Close(newFd)
-		return "", fmt.Errorf("failed to dup(2)(%d,%d) :%w", newFd, fd, err)
+		return "", fmt.Errorf("failed to dup(2)(%d,%d): %w", newFd, fd, err)
 	}
 
 	return rotateFilename, nil
