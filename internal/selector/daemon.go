@@ -80,9 +80,9 @@ func (i *Daemonizer) Execute() error {
 	invoke.Env = i.assembleEnvironment(os.Environ())
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
-	err = sys.ApplySysProc(invoke.SysProcAttr, false, false, true, 0)
+	err = sys.ApplySysProAttrSid(invoke.SysProcAttr)
 	if err != nil {
-		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+		return fmt.Errorf("failed to set session id: %w", err)
 	}
 
 	err = invoke.Start()

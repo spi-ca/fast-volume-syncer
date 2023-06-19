@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -141,12 +142,18 @@ func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- r
 	invoke.Stdin = nil
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
-	if err := sys.ApplySysProc(invoke.SysProcAttr, false, false, false, syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+	if err := sys.ApplySysProAttrPdeathsig(invoke.SysProcAttr, syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to set pdeathsig(%s): %w", syscall.SIGTERM, err)
 	}
 
 	stdout, _ := invoke.StdoutPipe()
 	stderr, _ := invoke.StderrPipe()
+
+	// On Linux, pdeathsig will kill the child process when the thread dies,
+	// not when the process dies. runtime.LockOSThread ensures that as long
+	// as this function is executing that OS thread will still be around
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
 	if err := invoke.Start(); err != nil {
 		return fmt.Errorf("failed to start process(find): %w", err)

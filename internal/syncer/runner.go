@@ -70,7 +70,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 
 	if r.Common.UseRsync {
 		copyMethodHandler := rsync.Task{
-			Arguments:       r.Common.Args.Assemble(srcPath, dstPath),
+			Arguments:       r.Common.Args,
 			FileMode:        r.Common.FileMode,
 			Retry:           r.Common.Retry,
 			SourcePath:      srcPath,

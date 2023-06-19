@@ -48,6 +48,7 @@ var (
 )
 
 type result struct {
+	chunkIdx      uint64
 	startIdx      int
 	lastFilenames [10]string
 	total         int
@@ -98,7 +99,7 @@ func (r *result) listFilename() []string {
 func (r *result) String() string {
 	buf := &strings.Builder{}
 
-	_, _ = fmt.Fprintf(buf, "rsync(%d)", r.pid)
+	_, _ = fmt.Fprintf(buf, "[chk:%d]rsync(%d)", r.chunkIdx, r.pid)
 
 	err, _ := r.rsyncExitResult()
 	if err != nil {
@@ -222,8 +223,8 @@ func (r *result) rsyncExitResult() (error, bool) {
 		buf.WriteByte(']')
 	}
 	if err := r.err; err != nil {
-		return fmt.Errorf("%s: %w%s", res.Message, err, buf.String()), res.Retryable
+		return fmt.Errorf("[chk:%d]%s: %w%s", r.chunkIdx, res.Message, err, buf.String()), res.Retryable
 	} else {
-		return fmt.Errorf("%s%s", res.Message, buf.String()), res.Retryable
+		return fmt.Errorf("[chk:%d]%s%s", r.chunkIdx, res.Message, buf.String()), res.Retryable
 	}
 }

@@ -10,8 +10,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unicode"
@@ -31,11 +33,12 @@ var (
 )
 
 type Task struct {
-	Arguments       []string
+	Arguments       args.RsyncArgs
 	FileMode        os.FileMode
 	SourcePath      string
 	DestinationPath string
 	Retry           args.RetryArgs
+	chunkIdx        uint64
 }
 
 func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
@@ -50,31 +53,37 @@ func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
 }
 
 func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinfo) error {
-
+	chunkIdx := atomic.AddUint64(&t.chunkIdx, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	invoke := exec.CommandContext(
 		ctx,
 		"rsync",
-		t.Arguments...,
+		t.Arguments.Assemble(t.SourcePath, t.DestinationPath)...,
 	)
 
 	invoke.Env = os.Environ()
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
-	if err := sys.ApplySysProc(invoke.SysProcAttr, false, false, false, syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+	if err := sys.ApplySysProAttrPdeathsig(invoke.SysProcAttr, syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to set pdeathsig(%s): %w", syscall.SIGTERM, err)
 	}
 
 	stdin, _ := invoke.StdinPipe()
 	stdout, _ := invoke.StdoutPipe()
 	stderr, _ := invoke.StderrPipe()
 
+	// On Linux, pdeathsig will kill the child process when the thread dies,
+	// not when the process dies. runtime.LockOSThread ensures that as long
+	// as this function is executing that OS thread will still be around
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	if err := invoke.Start(); err != nil {
 		return fmt.Errorf("failed to start process(rsync): %w", err)
 	}
-	res := &result{total: len(fileList), started: time.Now(), pid: invoke.Process.Pid}
+	res := &result{chunkIdx: chunkIdx, total: len(fileList), started: time.Now(), pid: invoke.Process.Pid}
 
 	go func() {
 		select {
@@ -169,7 +178,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, closer func(), f
 		progressbar.OptionSetPredictTime(false),
 		progressbar.OptionThrottle(time.Second),
 		progressbar.OptionSetItsString("op"),
-		progressbar.OptionSetDescription(fmt.Sprintf("[%d]", res.pid)),
+		progressbar.OptionSetDescription(fmt.Sprintf("[chk:%d]\t", res.chunkIdx)),
 		progressbar.OptionSetTheme(progressbar.Theme{
 			Saucer:        "-",
 			SaucerHead:    ">",
@@ -266,7 +275,7 @@ func (t *Task) processDirectory(dstPath string, dstMode os.FileMode) error {
 		// directory path 확보상태(비어있음)
 		err = os.MkdirAll(dstPath, dstMode)
 		if err != nil {
-			return fmt.Errorf("failed to make a directory(%s,%s): %w; %w", dstPath, dstMode, err)
+			return fmt.Errorf("failed to make a directory(%s,%s): %w", dstPath, dstMode, err)
 		}
 	}
 

@@ -3,7 +3,6 @@ package find
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
@@ -21,13 +20,6 @@ func (s *Scanner) Scan(ctx context.Context, root string) (<-chan returns.Fileinf
 	return entryChan, errorChan
 }
 
-func (s *Scanner) ignoreFilename(path string) bool {
-	filename := filepath.Base(path)
-	// 자기자신은 무시하자
-	ignored, ok := ignoreFilename[filename]
-	return ok && ignored
-}
-
 func (s *Scanner) execute(ctx context.Context, root string, entryChan chan<- returns.Fileinfo, errorChan chan<- error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -39,7 +31,7 @@ func (s *Scanner) execute(ctx context.Context, root string, entryChan chan<- ret
 
 	var scanner func(context.Context, string, chan<- returns.Fileinfo) error
 	if len(s.FinderBinaryPath) > 0 {
-		util.InfoLog.Printf("directory scan using finder")
+		util.InfoLog.Printf("directory scan using find binary")
 		scanner = s.executeFind
 	} else {
 		util.InfoLog.Printf("directory scan using filepath.WalkDir")

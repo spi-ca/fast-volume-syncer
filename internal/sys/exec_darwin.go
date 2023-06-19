@@ -1,15 +1,16 @@
-//go:build linux
-// +build linux
+//go:build darwin
+// +build darwin
 
 package sys
 
 import (
+	"fmt"
+	"runtime"
 	"syscall"
 )
 
 func ApplySysProAttrIsolation(attr *syscall.SysProcAttr) error {
-	attr.Unshareflags |= syscall.CLONE_NEWNS | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_FS
-	return nil
+	return fmt.Errorf("this os(%s) not supported", runtime.GOOS)
 }
 
 func ApplySysProAttrPGid(attr *syscall.SysProcAttr) error {
@@ -23,6 +24,6 @@ func ApplySysProAttrSid(attr *syscall.SysProcAttr) error {
 }
 
 func ApplySysProAttrPdeathsig(attr *syscall.SysProcAttr, pdeathsig syscall.Signal) error {
-	attr.Pdeathsig = pdeathsig
+	// fmt.Errorf("this os(%s) not supported", runtime.GOOS)
 	return nil
 }

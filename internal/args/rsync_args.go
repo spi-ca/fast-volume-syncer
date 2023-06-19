@@ -15,7 +15,7 @@ type RsyncArgs struct {
 	BandwidthLimit     string
 }
 
-func (a *RsyncArgs) Assemble(src, dst string) []string {
+func (a RsyncArgs) Assemble(src, dst string) []string {
 	args := []string{
 		//"--links",
 		//"--safe-links",

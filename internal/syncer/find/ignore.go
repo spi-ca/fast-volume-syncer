@@ -1,5 +1,7 @@
 package find
 
+import "path/filepath"
+
 var (
 	ignoreFilename = map[string]bool{
 		".":                                   true,
@@ -32,3 +34,10 @@ var (
 		"Desktop.ini":                         true,
 	}
 )
+
+func (s *Scanner) ignoreFilename(path string) bool {
+	filename := filepath.Base(path)
+	// 자기자신은 무시하자
+	ignored, ok := ignoreFilename[filename]
+	return ok && ignored
+}

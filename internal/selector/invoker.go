@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,12 +34,28 @@ func (i *Invoker) Run(parentContext context.Context, entry copyEntry) error {
 	invoke.Env = i.assembleEnvironment(os.Environ())
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
-	if err := sys.ApplySysProc(invoke.SysProcAttr, !i.SandboxDisabled, true, false, syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+	if i.SandboxDisabled {
+		//do nothing
+	} else if err := sys.ApplySysProAttrIsolation(invoke.SysProcAttr); err != nil {
+		return fmt.Errorf("failed to set unshare flags id: %w", err)
+	}
+
+	if err := sys.ApplySysProAttrPGid(invoke.SysProcAttr); err != nil {
+		return fmt.Errorf("failed to set process group id: %w", err)
+	}
+
+	if err := sys.ApplySysProAttrPdeathsig(invoke.SysProcAttr, syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to set pdeathsig(%s): %w", syscall.SIGTERM, err)
 	}
 
 	stdout, _ := invoke.StdoutPipe()
 	stderr, _ := invoke.StderrPipe()
+
+	// On Linux, pdeathsig will kill the child process when the thread dies,
+	// not when the process dies. runtime.LockOSThread ensures that as long
+	// as this function is executing that OS thread will still be around
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
 	if err := invoke.Start(); err != nil {
 		return fmt.Errorf("failed to start process(rsync): %w", err)
