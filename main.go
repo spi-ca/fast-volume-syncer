@@ -36,6 +36,7 @@ func init() {
 	flags.Bool("report-disabled", false, "don't do list files")
 
 	flags.String("sandbox-mount-option", "size=150M,mode=700,nosuid,noexec,nodev", "(selector only)sandbox mount option")
+	flags.String("file-mode", "-rw-r--r--", "setting with default filemode")
 	flags.Bool("rsync-enabled", false, "use rsync method")
 	flags.Bool("rsync-verbose", false, "make rsync verbosely")
 	flags.Bool("rsync-delete", false, "wipe conflicted destination path")

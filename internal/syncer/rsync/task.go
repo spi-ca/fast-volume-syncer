@@ -32,6 +32,7 @@ var (
 
 type Task struct {
 	Arguments       []string
+	FileMode        os.FileMode
 	SourcePath      string
 	DestinationPath string
 	Retry           args.RetryArgs
@@ -46,6 +47,52 @@ func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
 	retryOptionArgs := t.Retry.Assemble(ctx)
 	retryFunc := func() error { return t.execute(ctx, fileList) }
 	return retry.Do(retryFunc, retryOptionArgs...)
+}
+
+func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinfo) error {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	invoke := exec.CommandContext(
+		ctx,
+		"rsync",
+		t.Arguments...,
+	)
+
+	invoke.Env = os.Environ()
+	invoke.SysProcAttr = &syscall.SysProcAttr{}
+
+	if err := sys.ApplySysProc(invoke.SysProcAttr, false, false, false, syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+	}
+
+	stdin, _ := invoke.StdinPipe()
+	stdout, _ := invoke.StdoutPipe()
+	stderr, _ := invoke.StderrPipe()
+
+	if err := invoke.Start(); err != nil {
+		return fmt.Errorf("failed to start process(rsync): %w", err)
+	}
+	res := &result{total: len(fileList), started: time.Now(), pid: invoke.Process.Pid}
+
+	go func() {
+		select {
+		case <-parentContext.Done():
+			_ = invoke.Process.Signal(syscall.SIGTERM)
+		case <-ctx.Done():
+		}
+	}()
+
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
+	go t.handleRsyncStdin(stdin, wg.Done, fileList)
+	go t.handleRsyncStdout(res, stdout, wg.Done, fileList)
+	go t.handleRsyncStderr(res, stderr, wg.Done)
+	res.err = invoke.Wait()
+	wg.Wait()
+	util.InfoLog.Print(res)
+	return res.HandleError()
 }
 
 func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList []returns.Fileinfo) {
@@ -64,89 +111,20 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList [
 		mode := entry.Mode
 		if mode.IsDir() {
 			// ensure mode
-			dirMode := mode.Perm() | 0o700
-
+			dirMode := mode.Perm() | t.FileMode.Perm()
 			dirPath := filepath.Join(t.DestinationPath, entry.Path)
-			destExists := false
-			if dirPath == t.DestinationPath {
-				// 자기자신은 무시하자
+			err := t.processDirectory(dirPath, dirMode)
+			if err != nil {
+				util.ErrLog.Print(err)
 				continue
-			} else if destMode, err := os.Lstat(dirPath); err == nil {
-				if destExists = destMode.IsDir(); !destExists {
-					// 대상 path가 directory mode가 아닌 경우 대상을 날린다.
-					if err = os.RemoveAll(dirPath); err != nil {
-						util.ErrLog.Printf("failed to cleanup path %s :%v", dirPath, err)
-						continue
-					}
-				}
-			} else if !os.IsNotExist(err) {
-				util.ErrLog.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
-				continue
-			}
-
-			if destExists {
-				// directory path 확보상태(이미 생성됨)
-				err := os.Chmod(dirPath, dirMode)
-				if err != nil {
-					util.ErrLog.Printf("failed to change directory mode %s(%s) :%v", dirPath, dirMode, err)
-				}
-			} else {
-				// directory path 확보상태(비어있음)
-				err := os.MkdirAll(dirPath, dirMode)
-				if err != nil {
-					util.ErrLog.Printf("failed to create directory %s(%s) :%v", dirPath, dirMode, err)
-				}
 			}
 		} else if mode.Type()&fs.ModeSymlink != 0 {
 			linkPath := filepath.Join(t.DestinationPath, entry.Path)
-
-			if destMode, err := os.Lstat(linkPath); err == nil {
-				if destMode.Mode().Type()&fs.ModeSymlink != 0 {
-					// 대상 path가 symlink mode가 아닌 경우 대상을 날린다.
-					destLinkPath, readLinkErr := os.Readlink(linkPath)
-					if readLinkErr == nil && destLinkPath == entry.SymlinkPath {
-						continue
-					}
-				}
-
-				if err = os.RemoveAll(linkPath); err != nil {
-					util.ErrLog.Printf("failed to cleanup path %s :%v", linkPath, err)
-					continue
-				}
-			} else if !os.IsNotExist(err) {
-				util.ErrLog.Printf("failed to create symlink %s, cannot get filestat :%v", linkPath, err)
+			err := t.processSymbolicLink(entry.SymlinkPath, linkPath)
+			if err != nil {
+				util.ErrLog.Print(err)
 				continue
 			}
-
-			// directory보다 링크가 먼저 온 case
-			dirPath := filepath.Dir(linkPath)
-			if destMode, err := os.Lstat(dirPath); err == nil {
-				if !destMode.IsDir() {
-					// 대상 path가 directory mode가 아닌 경우 대상을 날린다.
-					if err = os.RemoveAll(dirPath); err != nil {
-						util.ErrLog.Printf("failed to make a symbolic link(%s -> %s), failed to cleanup path %s :%v",
-							linkPath, entry.SymlinkPath, dirPath, err)
-						continue
-					}
-				}
-			} else if !os.IsNotExist(err) {
-				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s), failed to get fileinfo %s :%v",
-					linkPath, entry.SymlinkPath, dirPath, err)
-				continue
-			} else if err = os.MkdirAll(dirPath, 0o755); err != nil {
-				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s), failed to create directory %s :%v",
-					linkPath, entry.SymlinkPath,
-					dirPath, err,
-				)
-			}
-
-			if err := os.Symlink(entry.SymlinkPath, linkPath); err == nil {
-				continue
-			} else {
-				util.ErrLog.Printf("failed to make a symbolic link(%s -> %s) :%v", linkPath, entry.SymlinkPath, err)
-				continue
-			}
-
 		} else if mode.IsRegular() {
 			if addSep {
 				_ = w.WriteByte('\n')
@@ -252,48 +230,94 @@ func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closer func()) {
 	}
 }
 
-func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinfo) error {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	invoke := exec.CommandContext(
-		ctx,
-		"rsync",
-		t.Arguments...,
-	)
-
-	invoke.Env = os.Environ()
-	invoke.SysProcAttr = &syscall.SysProcAttr{}
-
-	if err := sys.ApplySysProc(invoke.SysProcAttr, false, false, false, syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to set SysProcAttr: %w", err)
+func (t *Task) processDirectory(dstPath string, dstMode os.FileMode) error {
+	destExists := false
+	if dstPath == t.DestinationPath {
+		// 자기자신은 무시하자
+		return nil
 	}
 
-	stdin, _ := invoke.StdinPipe()
-	stdout, _ := invoke.StdoutPipe()
-	stderr, _ := invoke.StderrPipe()
+	existDstMode, err := os.Lstat(dstPath)
 
-	if err := invoke.Start(); err != nil {
-		return fmt.Errorf("failed to start process(rsync): %w", err)
-	}
-	res := &result{total: len(fileList), started: time.Now(), pid: invoke.Process.Pid}
-
-	go func() {
-		select {
-		case <-parentContext.Done():
-			_ = invoke.Process.Signal(syscall.SIGTERM)
-		case <-ctx.Done():
+	if err == nil {
+		if destExists = existDstMode.IsDir(); !destExists {
+			// 대상 path가 directory mode가 아닌 경우 대상을 날린다.
+			err = os.RemoveAll(dstPath)
+			if err != nil {
+				return fmt.Errorf("failed to cleanup path %s :%w", dstPath, err)
+			}
 		}
-	}()
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to create directory %s(%s) :%w", dstPath, dstMode, err)
+	}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(3)
-	go t.handleRsyncStdin(stdin, wg.Done, fileList)
-	go t.handleRsyncStdout(res, stdout, wg.Done, fileList)
-	go t.handleRsyncStderr(res, stderr, wg.Done)
-	res.err = invoke.Wait()
-	wg.Wait()
-	util.InfoLog.Print(res)
-	return res.HandleError()
+	if destExists {
+		// directory path 확보상태(이미 생성됨)
+		if existDstMode.Mode() == dstMode {
+			return nil
+		}
+
+		err = os.Chmod(dstPath, dstMode)
+		if err != nil {
+			return fmt.Errorf("failed to change directory(%s,%s): %w", dstPath, dstMode, err)
+
+		}
+	} else {
+		// directory path 확보상태(비어있음)
+		err = os.MkdirAll(dstPath, dstMode)
+		if err != nil {
+			return fmt.Errorf("failed to make a directory(%s,%s): %w; %w", dstPath, dstMode, err)
+		}
+	}
+
+	return nil
+}
+
+func (t *Task) processSymbolicLink(linkPath, dstPath string) error {
+
+	if dstMode, err := os.Lstat(dstPath); err == nil {
+		if dstMode.Mode().Type()&fs.ModeSymlink != 0 {
+			existDstLinkPath, readLinkErr := os.Readlink(dstPath)
+			if readLinkErr == nil && existDstLinkPath == linkPath {
+				// 대상파일의 링크정보가 일치함
+				return nil
+			}
+		}
+
+		// 대상 path가 symlink mode가 아닌 경우 대상을 날린다.
+		err = os.RemoveAll(dstPath)
+		if err != nil {
+			return fmt.Errorf("failed to cleanup path %s :%w", dstPath, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to create symlink %s, cannot get filestat :%w", dstPath, err)
+	} else {
+		// 자식이 없다는것은 부모도 없을 수 있다는 의미.  directory보다 링크가 먼저 온 case
+		dirPath := filepath.Dir(dstPath)
+		existDstDirMode, err := os.Lstat(dirPath)
+		if err == nil {
+			if !existDstDirMode.IsDir() {
+				// 대상 path가 directory mode가 아닌 경우 대상을 날린다.
+				err = os.RemoveAll(dirPath)
+				if err != nil {
+					return fmt.Errorf("failed to make a symbolic link(%s -> %s), failed to cleanup path %s :%w",
+						dstPath, linkPath, dirPath, err)
+				}
+			}
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to make a symbolic link(%s -> %s), failed to get fileinfo %s :%w",
+				dstPath, linkPath, dirPath, err)
+		} else if err = os.MkdirAll(dirPath, 0o755); err != nil {
+			return fmt.Errorf("failed to make a symbolic link(%s -> %s), failed to create directory %s :%w",
+				dstPath, linkPath,
+				dirPath, err,
+			)
+		}
+	}
+
+	err := os.Symlink(linkPath, dstPath)
+	if err != nil {
+		err = fmt.Errorf("failed to make a symbolic link(%s -> %s) :%w", dstPath, linkPath, err)
+	}
+	return err
 }

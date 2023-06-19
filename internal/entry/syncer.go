@@ -13,6 +13,7 @@ import (
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
@@ -48,44 +49,47 @@ func Syncer(
 	}
 
 	// debug
-	util.InfoLog.Print("args:")
-	util.InfoLog.Print("	report.disabled=", viper.GetBool("report.disabled"))
-	util.InfoLog.Print("	sandbox.mount.option=", viper.GetString("sandbox.mount.option"))
-	util.InfoLog.Print("	rsync.enabled=", viper.GetBool("rsync.enabled"))
-	util.InfoLog.Print("	rsync.delete=", viper.GetBool("rsync.delete"))
-	util.InfoLog.Print("	rsync.perms=", viper.GetBool("rsync.perms"))
-	util.InfoLog.Print("	rsync.owner=", viper.GetBool("rsync.owner"))
-	util.InfoLog.Print("	rsync.special=", viper.GetBool("rsync.special"))
-	util.InfoLog.Print("	rsync.compress=", viper.GetBool("rsync.compress"))
-	util.InfoLog.Print("	rsync.whole.file=", viper.GetBool("rsync.whole.file"))
-	util.InfoLog.Print("	rsync.inplace=", viper.GetBool("rsync.inplace"))
-	util.InfoLog.Print("	rsync.recursive=", viper.GetBool("rsync.recursive"))
-	util.InfoLog.Print("	rsync.bandwidth.limit=", viper.GetString("rsync.bandwidth.limit"))
-	util.InfoLog.Print("	src.storage.mount.host=", viper.GetString("src.storage.mount.host"))
-	util.InfoLog.Print("	src.storage.mount.option=", viper.GetString("src.storage.mount.option"))
-	util.InfoLog.Print("	src.storage.mount.name=", viper.GetString("src.storage.mount.name"))
-	util.InfoLog.Print("	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"))
-	util.InfoLog.Print("	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"))
-	util.InfoLog.Print("	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"))
-	util.InfoLog.Print("	scan.deadline=", viper.GetDuration("scan.deadline"))
-	util.InfoLog.Print("	scan.find.path=", viper.GetString("scan.find.path"))
-	util.InfoLog.Print("	task.size=", viper.GetInt("task.size"))
-	util.InfoLog.Print("	chunk.size=", viper.GetInt("chunk.size"))
-	util.InfoLog.Print("	retry.attempts=", viper.GetInt("retry.attempts"))
-	util.InfoLog.Print("	retry.delay=", viper.GetDuration("retry.delay"))
-	util.InfoLog.Print("	retry.max.delay=", viper.GetDuration("retry.max.delay"))
-	util.InfoLog.Print("	retry.max.jitter=", viper.GetDuration("retry.max.jitter"))
-	util.InfoLog.Print("	daemonized=", daemonized)
-	util.InfoLog.Print("	sandboxSupported=", sandboxSupported)
-	util.InfoLog.Print("	sandboxed=", sandboxed)
-	util.InfoLog.Print("	argSrcStoragePath=", srcStoragePath)
-	util.InfoLog.Print("	argSrcStorageSubPath=", srcStorageSubPath)
-	util.InfoLog.Print("	argDstStoragePath=", dstStoragePath)
-	util.InfoLog.Print("	argDstStorageSubPath=", dstStorageSubPath)
-	util.InfoLog.Print("	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"))
-	util.InfoLog.Print("	env['_SYNCER_INVOKED']=", os.Getenv("_SYNCER_INVOKED"))
-	util.InfoLog.Print("	env['_SYNCER_SANDBOXED']=", os.Getenv("_SYNCER_SANDBOXED"))
-	util.InfoLog.Print("---")
+	util.InfoLog.Print(
+		"args:",
+		"\n	report.disabled=", viper.GetBool("report.disabled"),
+		"\n	sandbox.mount.option=", viper.GetString("sandbox.mount.option"),
+		"\n	file.mode=", viper.GetBool("file.mode"),
+		"\n	rsync.enabled=", viper.GetBool("rsync.enabled"),
+		"\n	rsync.delete=", viper.GetBool("rsync.delete"),
+		"\n	rsync.perms=", viper.GetBool("rsync.perms"),
+		"\n	rsync.owner=", viper.GetBool("rsync.owner"),
+		"\n	rsync.special=", viper.GetBool("rsync.special"),
+		"\n	rsync.compress=", viper.GetBool("rsync.compress"),
+		"\n	rsync.whole.file=", viper.GetBool("rsync.whole.file"),
+		"\n	rsync.inplace=", viper.GetBool("rsync.inplace"),
+		"\n	rsync.recursive=", viper.GetBool("rsync.recursive"),
+		"\n	rsync.bandwidth.limit=", viper.GetString("rsync.bandwidth.limit"),
+		"\n	src.storage.mount.host=", viper.GetString("src.storage.mount.host"),
+		"\n	src.storage.mount.option=", viper.GetString("src.storage.mount.option"),
+		"\n	src.storage.mount.name=", viper.GetString("src.storage.mount.name"),
+		"\n	dst.storage.mount.host=", viper.GetString("dst.storage.mount.host"),
+		"\n	dst.storage.mount.option=", viper.GetString("dst.storage.mount.option"),
+		"\n	dst.storage.mount.name=", viper.GetString("dst.storage.mount.name"),
+		"\n	scan.deadline=", viper.GetDuration("scan.deadline"),
+		"\n	scan.find.path=", viper.GetString("scan.find.path"),
+		"\n	task.size=", viper.GetInt("task.size"),
+		"\n	chunk.size=", viper.GetInt("chunk.size"),
+		"\n	retry.attempts=", viper.GetInt("retry.attempts"),
+		"\n	retry.delay=", viper.GetDuration("retry.delay"),
+		"\n	retry.max.delay=", viper.GetDuration("retry.max.delay"),
+		"\n	retry.max.jitter=", viper.GetDuration("retry.max.jitter"),
+		"\n	daemonized=", daemonized,
+		"\n	sandboxSupported=", sandboxSupported,
+		"\n	sandboxed=", sandboxed,
+		"\n	argSrcStoragePath=", srcStoragePath,
+		"\n	argSrcStorageSubPath=", srcStorageSubPath,
+		"\n	argDstStoragePath=", dstStoragePath,
+		"\n	argDstStorageSubPath=", dstStorageSubPath,
+		"\n	env['_FVS_DAEMONEZED']=", os.Getenv("_FVS_DAEMONEZED"),
+		"\n	env['_SYNCER_INVOKED']=", os.Getenv("_SYNCER_INVOKED"),
+		"\n	env['_SYNCER_SANDBOXED']=", os.Getenv("_SYNCER_SANDBOXED"),
+		"\n---",
+	)
 
 	util.InfoLog.Printf("fast-volume-sync/syncer(sandboxed:%t,%s:%s,%s -> %s:%s,%s) had been initiated",
 		sandboxed,
@@ -98,6 +102,7 @@ func Syncer(
 		Common: args.SyncerCommonArguments{
 			ReportDisabled:     viper.GetBool("report.disabled"),
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
+			FileMode:           sys.UnFilemodeStr(viper.GetString("file.mode")),
 			UseRsync:           viper.GetBool("rsync.enabled"),
 			Args: args.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),

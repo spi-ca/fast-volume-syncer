@@ -49,15 +49,13 @@ func (r *Runner) Execute(ctx context.Context) error {
 		return err
 	}
 
-	util.InfoLog.Printf("TaskSize %d ChunkSize %d srcPath: %s dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
-
 	if !r.Common.ReportDisabled {
 		r.logVolumeInfo(srcPath)
 		r.logVolumeInfo(dstPath)
 	}
 
-	util.InfoLog.Print("=> split rsync")
-	util.InfoLog.Printf("chunk size is %d", r.Common.ChunkSize)
+	util.InfoLog.Print("=> split files")
+	util.InfoLog.Printf("TaskSize: %d, ChunkSize: %d, srcPath: %s, dstPath: %s", r.Common.TaskSize, r.Common.ChunkSize, srcPath, dstPath)
 
 	scanner := find.Scanner{
 		FinderBinaryPath: finderBinaryPath,
@@ -73,6 +71,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 	if r.Common.UseRsync {
 		copyMethodHandler := rsync.Task{
 			Arguments:       r.Common.Args.Assemble(srcPath, dstPath),
+			FileMode:        r.Common.FileMode,
 			Retry:           r.Common.Retry,
 			SourcePath:      srcPath,
 			DestinationPath: dstPath,
@@ -82,7 +81,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 		copyMethodHandler := copier.Copier{
 			SourceRoot:      srcPath,
 			DestinationRoot: dstPath,
-			Umask:           0o600,
+			FileMode:        r.Common.FileMode,
 			Retry:           r.Common.Retry,
 		}
 		joiner.copier = copyMethodHandler.Execute
@@ -114,34 +113,35 @@ func (r *Runner) Execute(ctx context.Context) error {
 
 }
 
-func (r *Runner) logLineByLine(reader io.Reader, prefix string) {
+func (r *Runner) logOutput(reader io.Reader, header, prefix string) {
 	scanner := bufio.NewScanner(reader)
+	builder := strings.Builder{}
+	builder.WriteString(header)
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
-		util.InfoLog.Print(prefix, line)
+		builder.WriteString(prefix)
+		builder.WriteString(line)
 	}
+	util.InfoLog.Print(builder.String())
 }
 
 func (r *Runner) logVolumeInfo(path string) {
 	if out, err := exec.Command("ls", "-al", path).CombinedOutput(); err != nil {
 		util.ErrLog.Printf("failed to start executable(ls): %v", err)
 	} else {
-		util.InfoLog.Printf("directory_info(%s)=>", path)
-		r.logLineByLine(bytes.NewReader(out), "\t")
+		r.logOutput(bytes.NewReader(out), fmt.Sprintf("directory_info(%s)=>", path), "\t")
 	}
 
 	if out, err := exec.Command("findmnt", "-T", path).CombinedOutput(); err != nil {
 		util.ErrLog.Printf("failed to start executable(findmnt): %v", err)
 	} else {
-		util.InfoLog.Printf("mount_info(%s)=>", path)
-		r.logLineByLine(bytes.NewReader(out), "\t")
+		r.logOutput(bytes.NewReader(out), fmt.Sprintf("mount_info(%s)=>", path), "\t")
 	}
 
 	if out, err := exec.Command("df", "-h", path).CombinedOutput(); err != nil {
 		util.ErrLog.Printf("failed to start executable(df): %v", err)
 	} else {
-		util.InfoLog.Printf("fs            =>\t")
-		r.logLineByLine(bytes.NewReader(out), "\t")
+		r.logOutput(bytes.NewReader(out), "fs            =>\t", "\t")
 	}
 }
 

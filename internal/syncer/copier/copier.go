@@ -34,28 +34,23 @@ const (
 type Copier struct {
 	SourceRoot      string
 	DestinationRoot string
-	Umask           os.FileMode
+	FileMode        os.FileMode
 	Retry           args.RetryArgs
 	chunkIdx        uint64
 }
 
-func (t *Copier) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
-	if t.Retry.Attempts <= 0 {
-		return t.execute(ctx, fileList)
+func (c *Copier) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
+	if c.Retry.Attempts <= 0 {
+		return c.execute(ctx, fileList)
 	}
 
-	retryOptionArgs := t.Retry.Assemble(ctx)
-	retryFunc := func() error { return t.execute(ctx, fileList) }
+	retryOptionArgs := c.Retry.Assemble(ctx)
+	retryFunc := func() error { return c.execute(ctx, fileList) }
 	return retry.Do(retryFunc, retryOptionArgs...)
 }
 
-func (t *Copier) execute(ctx context.Context, fileList []returns.Fileinfo) error {
-	chunkIdx := atomic.AddUint64(&t.chunkIdx, 1)
-	filenameSet := make(map[string]int)
-	for idx, info := range fileList {
-		filenameSet[info.Path] = idx
-	}
-
+func (c *Copier) execute(ctx context.Context, fileList []returns.Fileinfo) error {
+	chunkIdx := atomic.AddUint64(&c.chunkIdx, 1)
 	res := &result{chunkIdx: chunkIdx, total: len(fileList), started: time.Now()}
 
 	bar := progressbar.NewOptions(res.total,
@@ -79,7 +74,7 @@ func (t *Copier) execute(ctx context.Context, fileList []returns.Fileinfo) error
 
 forLoop:
 	for _, entry := range fileList {
-		copied, err := t.routeFileByTypes(ctx, chunkIdx, entry)
+		copied, err := c.routeFileByTypes(ctx, chunkIdx, entry)
 		_ = bar.Add(1)
 		res.appendFilename(entry.Path)
 		if err == nil {
@@ -110,25 +105,25 @@ forLoop:
 	return err
 }
 
-func (t *Copier) routeFileByTypes(ctx context.Context, chunkIdx uint64, srcInfo returns.Fileinfo) (int64, error) {
+func (c *Copier) routeFileByTypes(ctx context.Context, chunkIdx uint64, srcInfo returns.Fileinfo) (int64, error) {
 
 	var (
 		srcMode = srcInfo.Mode
-		dstMode = srcInfo.Mode.Perm() | t.Umask
+		dstMode = srcInfo.Mode.Perm() | c.FileMode.Perm()
 
-		srcPath = filepath.Join(t.SourceRoot, srcInfo.Path)
-		dstPath = filepath.Join(t.DestinationRoot, srcInfo.Path)
+		srcPath = filepath.Join(c.SourceRoot, srcInfo.Path)
+		dstPath = filepath.Join(c.DestinationRoot, srcInfo.Path)
 
 		copiedBytes int64 = -1
 		err         error
 	)
 
 	if srcMode.IsDir() {
-		err = t.processDirectory(dstPath, dstMode|0o100)
+		err = c.processDirectory(dstPath, dstMode|0o100)
 	} else if srcMode.Type()&fs.ModeSymlink != 0 {
-		err = t.processSymbolicLink(srcInfo.SymlinkPath, dstPath)
+		err = c.processSymbolicLink(srcInfo.SymlinkPath, dstPath)
 	} else if srcMode.IsRegular() {
-		copiedBytes, err = t.copyRegularFile(ctx, chunkIdx, srcPath, dstPath, dstMode)
+		copiedBytes, err = c.copyRegularFile(ctx, chunkIdx, srcPath, dstPath, dstMode)
 	} else {
 		err = fmt.Errorf("unexpected filemode(%s) :,%w", srcMode, ErrCopierSkipped)
 	}
@@ -143,13 +138,13 @@ func (t *Copier) routeFileByTypes(ctx context.Context, chunkIdx uint64, srcInfo 
 	}
 }
 
-func (t *Copier) processDirectory(dstPath string, dstMode os.FileMode) error {
+func (c *Copier) processDirectory(dstPath string, dstMode os.FileMode) error {
 	destExists := false
 
-	destMode, err := os.Lstat(dstPath)
+	existDstMode, err := os.Lstat(dstPath)
 
 	if err == nil {
-		if destExists = destMode.IsDir(); !destExists {
+		if destExists = existDstMode.IsDir(); !destExists {
 			// 대상 path가 directory mode가 아닌 경우 대상을 날린다.
 			err = os.RemoveAll(dstPath)
 			if err != nil {
@@ -162,7 +157,7 @@ func (t *Copier) processDirectory(dstPath string, dstMode os.FileMode) error {
 
 	if destExists {
 		// directory path 확보상태(이미 생성됨)
-		if destMode.Mode() == dstMode {
+		if existDstMode.Mode() == dstMode {
 			return ErrCopierUptodate
 		}
 
@@ -181,11 +176,11 @@ func (t *Copier) processDirectory(dstPath string, dstMode os.FileMode) error {
 	return nil
 }
 
-func (t *Copier) processSymbolicLink(linkPath, dstPath string) error {
+func (c *Copier) processSymbolicLink(linkPath, dstPath string) error {
 	if dstMode, err := os.Lstat(dstPath); err == nil {
 		if dstMode.Mode().Type()&fs.ModeSymlink != 0 {
-			destLinkPath, readLinkErr := os.Readlink(dstPath)
-			if readLinkErr == nil && destLinkPath == linkPath {
+			existDstLinkPath, readLinkErr := os.Readlink(dstPath)
+			if readLinkErr == nil && existDstLinkPath == linkPath {
 				// 대상파일의 링크정보가 일치함
 				return ErrCopierUptodate
 			}
@@ -198,8 +193,7 @@ func (t *Copier) processSymbolicLink(linkPath, dstPath string) error {
 		}
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("failed to get destination info: %w; %w", ErrCopierProcessSymbolicLinkFailed, err)
-	} else if err = t.makeParentsExist(dstPath); err != nil {
-		// 자식이 없다는것은 부모도 없다는의미.
+	} else if err = c.makeParentsExist(dstPath); err != nil { // 자식이 없다는것은 부모도 없을 수 있다는 의미.
 		return err
 	}
 
@@ -210,8 +204,8 @@ func (t *Copier) processSymbolicLink(linkPath, dstPath string) error {
 	return nil
 }
 
-func (t *Copier) copyRegularFile(ctx context.Context, chunkIdx uint64, srcPath string, dstPath string, dstMode os.FileMode) (int64, error) {
-	differ, err := t.compareFile(srcPath, dstPath)
+func (c *Copier) copyRegularFile(ctx context.Context, chunkIdx uint64, srcPath string, dstPath string, dstMode os.FileMode) (int64, error) {
+	differ, err := c.compareFile(srcPath, dstPath)
 	if err != nil {
 		return 0, err
 	}
@@ -222,9 +216,9 @@ func (t *Copier) copyRegularFile(ctx context.Context, chunkIdx uint64, srcPath s
 		// source file disappears..
 		return 0, errors.Join(ErrCopierSrcNotExist, err)
 	case compareDiffer:
-		return t.copyFile(ctx, chunkIdx, srcPath, dstPath, dstMode, true)
+		return c.copyFile(ctx, chunkIdx, srcPath, dstPath, dstMode, true)
 	case compareDstNotExist:
-		return t.copyFile(ctx, chunkIdx, srcPath, dstPath, dstMode, false)
+		return c.copyFile(ctx, chunkIdx, srcPath, dstPath, dstMode, false)
 	case compareDstIsNewer:
 		util.ErrLog.Printf("[chk:%d]destination(%s) is newer than source(%s)", chunkIdx, dstPath, dstMode)
 		return 0, nil
@@ -233,7 +227,7 @@ func (t *Copier) copyRegularFile(ctx context.Context, chunkIdx uint64, srcPath s
 	}
 }
 
-func (t *Copier) compareFile(srcPath string, dstPath string) (int, error) {
+func (c *Copier) compareFile(srcPath string, dstPath string) (int, error) {
 	srcMode, err := os.Lstat(srcPath)
 	if err == nil {
 		// do nothing
@@ -267,7 +261,7 @@ func (t *Copier) compareFile(srcPath string, dstPath string) (int, error) {
 	}
 }
 
-func (t *Copier) copyFile(parentCtx context.Context, chunkIdx uint64, srcPath, dstPath string, mode os.FileMode, dstExists bool) (int64, error) {
+func (c *Copier) copyFile(parentCtx context.Context, chunkIdx uint64, srcPath, dstPath string, mode os.FileMode, dstExists bool) (int64, error) {
 	dstDir := filepath.Dir(dstPath)
 	src, err := os.OpenFile(srcPath, os.O_RDONLY, 0o644)
 	if err == nil {
@@ -289,8 +283,8 @@ func (t *Copier) copyFile(parentCtx context.Context, chunkIdx uint64, srcPath, d
 	defer src.Close()
 
 	if !dstExists {
-		if err = t.makeParentsExist(dstPath); err != nil {
-			// 자식이 없다는것은 부모도 없다는의미.
+		if err = c.makeParentsExist(dstPath); err != nil {
+			// 자식이 없다는것은 부모도 없을 수 있다는 의미.
 			return 0, err
 		}
 	}
@@ -356,10 +350,10 @@ func (t *Copier) copyFile(parentCtx context.Context, chunkIdx uint64, srcPath, d
 	return copied, nil
 }
 
-func (t *Copier) makeParentsExist(dstPath string) error {
+func (c *Copier) makeParentsExist(dstPath string) error {
 	dirPath := filepath.Dir(dstPath)
-	if destMode, err := os.Lstat(dirPath); err == nil {
-		if !destMode.IsDir() {
+	if existDstMode, err := os.Lstat(dirPath); err == nil {
+		if !existDstMode.IsDir() {
 			// 대상 path가 directory mode가 아닌 경우 대상을 날린다.
 			err = os.RemoveAll(dirPath)
 			if err != nil {

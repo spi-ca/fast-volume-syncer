@@ -1,6 +1,7 @@
 package args
 
 import (
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 type SyncerCommonArguments struct {
 	ReportDisabled     bool
 	SandboxMountOption string
+	FileMode           os.FileMode
 
 	Args RsyncArgs
 
@@ -35,6 +37,7 @@ func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string
 	envs = append(envs, "REPORT_DISABLED", strconv.FormatBool(i.ReportDisabled))
 	envs = append(envs, "SANDBOX_MOUNT_OPTION", i.SandboxMountOption)
 
+	envs = append(envs, "FILE_MODE", i.FileMode.String())
 	envs = append(envs, "RSYNC_ENABLED", strconv.FormatBool(i.UseRsync))
 	envs = append(envs, "RSYNC_VERBOSE", strconv.FormatBool(i.Args.Verbose))
 	envs = append(envs, "RSYNC_DELETE", strconv.FormatBool(i.Args.Delete))
