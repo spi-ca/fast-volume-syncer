@@ -15,6 +15,7 @@ var (
 
 func init() {
 	InfoLog.SetOutput(os.Stdout)
+	checkLogFile()
 }
 
 type LogWriter struct {

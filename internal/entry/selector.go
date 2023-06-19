@@ -22,16 +22,22 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 
 	// 시그널 처리
 	exitSignal := make(chan os.Signal, 1)
+	rotateSignal := make(chan os.Signal, 1)
 	signal.Notify(exitSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
+	signal.Notify(rotateSignal, syscall.SIGHUP)
 	defer signal.Ignore(syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	go func() {
-		select {
-		case <-ctx.Done():
-			return
-		case sysSignal := <-exitSignal:
-			util.ErrLog.Println(sysSignal.String(), " received")
-			cancel()
-			return
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-rotateSignal:
+				util.RotateLogs()
+			case sysSignal := <-exitSignal:
+				util.ErrLog.Println(sysSignal.String(), " received")
+				cancel()
+				return
+			}
 		}
 	}()
 
@@ -87,6 +93,8 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 			}
 			defer closer()
 		}
+
+		go util.StartRotateLogMignight(ctx)
 		util.ErrLog.Printf(fmt.Sprintf("fast-volume-sync/selector@%d(daemonized:%t) had been initiated", nodeSelector, daemonized))
 	}
 
