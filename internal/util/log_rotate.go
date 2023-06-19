@@ -59,6 +59,10 @@ func rotateLogsInternal(at time.Time) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
+	// 로그파일명 충돌을 막기 위하여 1초를 기다린다.
+	delay := time.After(time.Second)
+	defer func() { <-delay }()
+
 	stdoutFilePath, stdoutInfo, stdoutErr := sys.PathFromFd(os.Stdout.Fd())
 	stderrFilePath, stderrInfo, stderrErr := sys.PathFromFd(os.Stderr.Fd())
 	if stdoutErr != nil ||
