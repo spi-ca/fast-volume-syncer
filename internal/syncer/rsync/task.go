@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -166,7 +165,7 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList [
 func (t *Task) handleRsyncStdout(res *result, reader io.Reader, closer func(), fileList []returns.Fileinfo) {
 	defer closer()
 
-	prefix := fmt.Sprintf("[%d]&1> ", res.pid)
+	prefix := fmt.Sprintf("[%d] ", res.pid)
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(util.ScanLineFeed)
 
@@ -211,7 +210,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, closer func(), f
 		matched := rsyncUptodateFormat.FindSubmatchIndex(line)
 		groups := (len(matched) / 2) - 1
 		if groups < 0 {
-			log.Print(prefix, line)
+			util.InfoLog.Print(prefix, line)
 			continue
 		}
 		bar.Add(1)
@@ -244,7 +243,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, closer func(), f
 
 func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closer func()) {
 	defer closer()
-	prefix := fmt.Sprintf("[%d]&2> ", res.pid)
+	prefix := fmt.Sprintf("[%d] ", res.pid)
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)

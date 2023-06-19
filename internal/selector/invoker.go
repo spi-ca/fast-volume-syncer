@@ -83,7 +83,7 @@ func (i *Invoker) assembleEnvironment(inherited []string) []string {
 
 func (i *Invoker) handleStdout(res *returns.ExecutionResult, reader io.Reader, closer func()) {
 	defer closer()
-	prefix := fmt.Sprintf("[%d]&1> ", res.PID)
+	prefix := fmt.Sprintf("[%d] ", res.PID)
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)
@@ -93,7 +93,7 @@ func (i *Invoker) handleStdout(res *returns.ExecutionResult, reader io.Reader, c
 
 func (i *Invoker) handleStderr(res *returns.ExecutionResult, reader io.Reader, closer func()) {
 	defer closer()
-	prefix := fmt.Sprintf("[%d]&2> ", res.PID)
+	prefix := fmt.Sprintf("[%d] ", res.PID)
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := strings.TrimRightFunc(scanner.Text(), unicode.IsSpace)

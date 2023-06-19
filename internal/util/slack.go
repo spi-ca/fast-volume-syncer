@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -58,10 +59,15 @@ type slackSender struct {
 	circuitBreaker *gobreaker.CircuitBreaker
 	hostname       string
 	webhookUrl     string
+	logPrefix      []byte
 	doneChan       <-chan struct{}
 	messageChan    chan<- string
 	retry          args.RetryArgs
 	m              sync.RWMutex
+}
+
+func (s *slackSender) SetPrefix(prefix string) {
+	s.logPrefix = []byte(prefix)
 }
 
 func (s *slackSender) Send(message string) {
@@ -108,6 +114,8 @@ func (s *slackSender) Write(b []byte) (int, error) {
 	}
 	s.m.RLock()
 	defer s.m.RUnlock()
+
+	b = bytes.TrimPrefix(b, s.logPrefix)
 
 	if s.messageChan != nil {
 		select {

@@ -43,8 +43,8 @@ func Syncer(
 	if daemonized || selectorInvoked {
 		util.SetLogFlags(0)
 	} else {
-		util.InfoLog.SetPrefix(fmt.Sprintf("syncer[%d]&1> ", os.Getpid()))
-		util.ErrLog.SetPrefix(fmt.Sprintf("syncer[%d]&2> ", os.Getpid()))
+		util.InfoLog.SetPrefix(fmt.Sprintf("[%d]&1>", os.Getpid()))
+		util.ErrLog.SetPrefix(fmt.Sprintf("[%d]&2>", os.Getpid()))
 	}
 
 	// debug

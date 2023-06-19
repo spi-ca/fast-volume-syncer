@@ -57,7 +57,7 @@ func init() {
 	flags.Duration("scan-deadline", 3*time.Second, "scanning output deadline")
 	flags.String("scan-find-path", "find", "specify find binary path, or use golang implementation")
 	flags.IntP("task-size", "t", 30, "specifies the maximum number of rsync processes that can run concurrently")
-	flags.IntP("chunk-size", "c", 3000, "specifies how many files rsync will write at once")
+	flags.IntP("chunk-size", "c", 2000, "specifies how many files rsync will write at once")
 	flags.Int("retry-attempts", 3, "specifies the maximum number of retries. less than or equal to 0 means no retries.")
 	flags.Duration("retry-delay", 5*time.Second, "specifies the amount of time to wait between attempts.")
 	flags.Duration("retry-max-delay", 5*time.Minute, "specifies the maximum amount of time to wait between attempts. if less than or equal to 0, retries are performed at fixed time intervals rather than backoff policy.")
