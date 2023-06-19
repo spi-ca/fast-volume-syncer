@@ -125,7 +125,6 @@ func checkLogFile() {
 	stderrFilePath, stderrInfo, stderrErr := sys.PathFromFd(os.Stdout.Fd())
 	if stdoutErr != nil ||
 		stderrErr != nil {
-		ErrLog.Printf("failed to get stdout|stderr fileinfo: %v", errors.Join(stdoutErr, stderrErr))
 		return
 	} else if !stdoutInfo.Mode().IsRegular() ||
 		!stderrInfo.Mode().IsRegular() {
