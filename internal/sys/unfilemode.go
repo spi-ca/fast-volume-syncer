@@ -68,6 +68,9 @@ func UnFilemodeStr(modeStr string) fs.FileMode {
 	var mode fs.FileMode
 
 	for i, table := range filemodeMap {
+		if i >= len(modeStr) {
+			break
+		}
 		chr := modeStr[i]
 		for _, bitchar := range table {
 			if chr == bitchar.char {
