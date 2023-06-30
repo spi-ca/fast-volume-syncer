@@ -53,7 +53,7 @@ func Syncer(
 		"args:",
 		"\n	report.disabled=", viper.GetBool("report.disabled"),
 		"\n	sandbox.mount.option=", viper.GetString("sandbox.mount.option"),
-		"\n	file.mode=", viper.GetBool("file.mode"),
+		"\n	file.mode=", viper.GetString("file.mode"),
 		"\n	rsync.enabled=", viper.GetBool("rsync.enabled"),
 		"\n	rsync.delete=", viper.GetBool("rsync.delete"),
 		"\n	rsync.perms=", viper.GetBool("rsync.perms"),

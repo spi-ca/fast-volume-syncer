@@ -43,7 +43,7 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 		"\n	report.disabled=", viper.GetBool("report.disabled"),
 		"\n	sandbox.disabled=", viper.GetString("sandbox.disabled"),
 		"\n	sandbox.mount.option=", viper.GetString("sandbox.mount.option"),
-		"\n	file.mode=", viper.GetBool("file.mode"),
+		"\n	file.mode=", viper.GetString("file.mode"),
 		"\n	rsync.enabled=", viper.GetBool("rsync.enabled"),
 		"\n	rsync.verbose=", viper.GetBool("rsync.verbose"),
 		"\n	rsync.delete=", viper.GetBool("rsync.delete"),
