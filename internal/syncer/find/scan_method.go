@@ -31,16 +31,17 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 			return filepath.SkipDir
 		}
 
-		if s.ignoreFilename(relPath) {
+		mode := info.Mode()
+		if s.ignore(relPath, mode) {
 			return nil
 		}
 
 		entry := returns.Fileinfo{
 			Path: relPath,
-			Mode: info.Mode(),
+			Mode: mode,
 			Size: info.Size(),
 		}
-		if (info.Mode().Type() & fs.ModeSymlink) != 0 {
+		if (mode.Type() & fs.ModeSymlink) != 0 {
 			entry.SymlinkPath, err = os.Readlink(path)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to execute readlink file(%s) info: %w", path, err))

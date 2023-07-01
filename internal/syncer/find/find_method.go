@@ -117,9 +117,10 @@ func (s *Scanner) handleFindStdout(ctx context.Context, res *returns.ExecutionRe
 		if err != nil {
 			util.ErrLog.Printf("[%d]failed to make relative file path info: %v", res.PID, err)
 			continue
-		} else if s.ignoreFilename(relPath) {
+		} else if s.ignore(relPath, entry.Mode) {
 			continue
 		}
+
 		entry.Path = relPath
 
 		select {
