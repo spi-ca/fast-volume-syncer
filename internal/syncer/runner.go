@@ -49,7 +49,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 		return err
 	}
 
-	if !r.Common.ReportDisabled {
+	if r.Common.ReportEnabled {
 		r.logVolumeInfo(srcPath)
 		r.logVolumeInfo(dstPath)
 	}
@@ -101,7 +101,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 	}
 	err = errors.Join(errs...)
 
-	if !r.Common.ReportDisabled {
+	if r.Common.ReportEnabled {
 		r.logVolumeInfo(srcPath)
 		r.logVolumeInfo(dstPath)
 	}

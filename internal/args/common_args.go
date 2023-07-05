@@ -8,7 +8,7 @@ import (
 )
 
 type SyncerCommonArguments struct {
-	ReportDisabled     bool
+	ReportEnabled      bool
 	SandboxMountOption string
 	FileMode           os.FileMode
 
@@ -34,7 +34,7 @@ type SyncerCommonArguments struct {
 func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string {
 	envs := make([]string, 0, 23)
 
-	envs = append(envs, "REPORT_DISABLED", strconv.FormatBool(i.ReportDisabled))
+	envs = append(envs, "REPORT_ENABLED", strconv.FormatBool(i.ReportEnabled))
 	envs = append(envs, "SANDBOX_MOUNT_OPTION", i.SandboxMountOption)
 
 	envs = append(envs, "FILE_MODE", i.FileMode.String())

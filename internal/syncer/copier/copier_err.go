@@ -13,6 +13,7 @@ var (
 	ErrCopierProcessSymbolicLinkFailed = errors.New("failed to process a file entry")
 	ErrCopierCompareFailed             = errors.New("failed to compare between two file paths")
 	ErrCopierSkipped                   = errors.New("skipped file")
+	ErrCopierDstNoSpace                = errors.New("destination is full")
 )
 
 type copierError struct {

@@ -48,7 +48,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 
 	util.InfoLog.Print(
 		"args:",
-		"\n	report.disabled=", viper.GetBool("report.disabled"),
+		"\n	report.enabled=", viper.GetBool("report.enabled"),
 		"\n	sandbox.disabled=", viper.GetString("sandbox.disabled"),
 		"\n	sandbox.mount.option=", viper.GetString("sandbox.mount.option"),
 		"\n	file.mode=", viper.GetString("file.mode"),
@@ -107,7 +107,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 		Template: selector.Invoker{
 			SandboxDisabled: viper.GetBool("sandbox.disabled") || !sandboxSupported,
 			Common: args.SyncerCommonArguments{
-				ReportDisabled:     viper.GetBool("report.disabled"),
+				ReportEnabled:      viper.GetBool("report.enabled"),
 				SandboxMountOption: viper.GetString("sandbox.mount.option"),
 				FileMode:           sys.UnFilemodeStr(viper.GetString("file.mode")),
 				UseRsync:           viper.GetBool("rsync.enabled"),

@@ -51,7 +51,7 @@ func Syncer(
 	// debug
 	util.InfoLog.Print(
 		"args:",
-		"\n	report.disabled=", viper.GetBool("report.disabled"),
+		"\n	report.enabled=", viper.GetBool("report.enabled"),
 		"\n	sandbox.mount.option=", viper.GetString("sandbox.mount.option"),
 		"\n	file.mode=", viper.GetString("file.mode"),
 		"\n	rsync.enabled=", viper.GetBool("rsync.enabled"),
@@ -100,7 +100,7 @@ func Syncer(
 	runner := syncer.Runner{
 		Sandboxed: selectorInvoked && sandboxed && sandboxSupported,
 		Common: args.SyncerCommonArguments{
-			ReportDisabled:     viper.GetBool("report.disabled"),
+			ReportEnabled:      viper.GetBool("report.enabled"),
 			SandboxMountOption: viper.GetString("sandbox.mount.option"),
 			FileMode:           sys.UnFilemodeStr(viper.GetString("file.mode")),
 			UseRsync:           viper.GetBool("rsync.enabled"),

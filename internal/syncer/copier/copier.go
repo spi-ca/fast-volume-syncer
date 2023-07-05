@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/avast/retry-go"
@@ -72,6 +73,7 @@ func (c *Copier) execute(ctx context.Context, fileList []returns.Fileinfo) error
 		}))
 	defer bar.Close()
 
+	unrecoverable := false
 forLoop:
 	for _, entry := range fileList {
 		copied, err := c.routeFileByTypes(ctx, chunkIdx, entry)
@@ -93,6 +95,10 @@ forLoop:
 			res.disappeared++
 		} else if errors.Is(err, ErrCopierSkipped) {
 			res.skipped++
+		} else if errors.Is(err, ErrCopierDstNoSpace) {
+			res.errs = append(res.errs, err)
+			unrecoverable = true
+			break forLoop
 		} else {
 			res.errs = append(res.errs, err)
 		}
@@ -101,6 +107,8 @@ forLoop:
 	err := res.HandleError()
 	if err == nil {
 		util.InfoLog.Print(res)
+	} else if unrecoverable {
+		err = retry.Unrecoverable(err)
 	}
 	return err
 }
@@ -139,6 +147,11 @@ func (c *Copier) routeFileByTypes(ctx context.Context, chunkIdx uint64, srcInfo 
 }
 
 func (c *Copier) processDirectory(dstPath string, dstMode os.FileMode) error {
+	if dstPath == c.DestinationRoot {
+		// 자기자신은 무시하자
+		return nil
+	}
+
 	destExists := false
 
 	existDstMode, err := os.Lstat(dstPath)
@@ -290,7 +303,11 @@ func (c *Copier) copyFile(parentCtx context.Context, chunkIdx uint64, srcPath, d
 	}
 
 	tmp, err := os.CreateTemp(dstDir, fmt.Sprintf(".tmp-%x-%d", int64(os.Getpid())^time.Now().Unix(), chunkIdx))
-	if err != nil {
+	if err == nil {
+		// do nothing
+	} else if errors.Is(err, syscall.ENOSPC) {
+		return 0, errors.Join(ErrCopierDstNoSpace, err)
+	} else {
 		return 0, fmt.Errorf("failed to create a tempfile :%w; %w", ErrCopierCopyFailed, err)
 	}
 
@@ -312,6 +329,8 @@ func (c *Copier) copyFile(parentCtx context.Context, chunkIdx uint64, srcPath, d
 			break
 		} else if os.IsNotExist(cancelReason) {
 			err = errors.Join(ErrCopierSrcNotExist, err)
+		} else if errors.Is(err, syscall.ENOSPC) {
+			return 0, errors.Join(ErrCopierDstNoSpace, err)
 		} else {
 			err = errors.Join(ErrCopierCopyFailed, err)
 		}
