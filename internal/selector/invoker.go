@@ -83,7 +83,7 @@ func (i *Invoker) Run(parentContext context.Context, entry copyEntry) error {
 
 func (i *Invoker) assembleEnvironment(inherited []string) []string {
 	inherited = i.Common.AssembleEnvironment(inherited)
-	envs := make([]string, 0, 2)
+	envs := make([]string, 0, 2*2)
 	envs = append(envs, "_SYNCER_INVOKED", strconv.FormatBool(true))
 	envs = append(envs, "_SYNCER_SANDBOXED", strconv.FormatBool(!i.SandboxDisabled))
 

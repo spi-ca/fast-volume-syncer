@@ -7,21 +7,12 @@ import (
 	"time"
 )
 
-type SyncerCommonArguments struct {
-	ReportEnabled      bool
-	SandboxMountOption string
-	FileMode           os.FileMode
+type CopierCommonArguments struct {
+	FileMode os.FileMode
 
 	Args RsyncArgs
 
-	UseRsync           bool
-	SourceMountHost    string
-	SourceMountOptions string
-	SourceMountName    string
-
-	DestinationMountHost    string
-	DestinationMountOptions string
-	DestinationMountName    string
+	UseRsync bool
 
 	ScanDuration     time.Duration
 	FinderBinaryPath string
@@ -31,11 +22,8 @@ type SyncerCommonArguments struct {
 	Retry     RetryArgs
 }
 
-func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string {
-	envs := make([]string, 0, 23)
-
-	envs = append(envs, "REPORT_ENABLED", strconv.FormatBool(i.ReportEnabled))
-	envs = append(envs, "SANDBOX_MOUNT_OPTION", i.SandboxMountOption)
+func (i *CopierCommonArguments) AssembleEnvironment(inherited []string) []string {
+	envs := make([]string, 0, 20*2)
 
 	envs = append(envs, "FILE_MODE", i.FileMode.String())
 	envs = append(envs, "RSYNC_ENABLED", strconv.FormatBool(i.UseRsync))
@@ -50,14 +38,6 @@ func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string
 	envs = append(envs, "RSYNC_RECURSIVE", strconv.FormatBool(i.Args.Recursive))
 	envs = append(envs, "RSYNC_BANDWIDTH_LIMIT", i.Args.BandwidthLimit)
 
-	envs = append(envs, "SRC_STORAGE_MOUNT_HOST", i.SourceMountHost)
-	envs = append(envs, "SRC_STORAGE_MOUNT_OPTION", i.SourceMountOptions)
-	envs = append(envs, "SRC_STORAGE_MOUNT_NAME", i.SourceMountName)
-
-	envs = append(envs, "DST_STORAGE_MOUNT_HOST", i.DestinationMountHost)
-	envs = append(envs, "DST_STORAGE_MOUNT_OPTION", i.DestinationMountOptions)
-	envs = append(envs, "DST_STORAGE_MOUNT_NAME", i.DestinationMountName)
-
 	envs = append(envs, "SCAN_DEADLINE", i.ScanDuration.String())
 	envs = append(envs, "SCAN_FIND_PATH", i.FinderBinaryPath)
 
@@ -68,6 +48,48 @@ func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string
 	envs = append(envs, "RETRY_DELAY", i.Retry.Delay.String())
 	envs = append(envs, "RETRY_MAX_DELAY", i.Retry.MaxDelay.String())
 	envs = append(envs, "RETRY_MAX_JITTER", i.Retry.MaxJitter.String())
+
+	b := strings.Builder{}
+	for i := 0; i < len(envs)/2; i++ {
+		b.WriteString(envs[i*2])
+		b.WriteByte('=')
+		b.WriteString(envs[i*2+1])
+		inherited = append(inherited, b.String())
+		b.Reset()
+	}
+	return inherited
+}
+
+type SyncerCommonArguments struct {
+	ReportEnabled      bool
+	SandboxMountOption string
+
+	SourceMountHost    string
+	SourceMountOptions string
+	SourceMountName    string
+
+	DestinationMountHost    string
+	DestinationMountOptions string
+	DestinationMountName    string
+
+	Common CopierCommonArguments
+}
+
+func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string {
+	inherited = i.Common.AssembleEnvironment(inherited)
+
+	envs := make([]string, 0, 8*2)
+
+	envs = append(envs, "REPORT_ENABLED", strconv.FormatBool(i.ReportEnabled))
+	envs = append(envs, "SANDBOX_MOUNT_OPTION", i.SandboxMountOption)
+
+	envs = append(envs, "SRC_STORAGE_MOUNT_HOST", i.SourceMountHost)
+	envs = append(envs, "SRC_STORAGE_MOUNT_OPTION", i.SourceMountOptions)
+	envs = append(envs, "SRC_STORAGE_MOUNT_NAME", i.SourceMountName)
+
+	envs = append(envs, "DST_STORAGE_MOUNT_HOST", i.DestinationMountHost)
+	envs = append(envs, "DST_STORAGE_MOUNT_OPTION", i.DestinationMountOptions)
+	envs = append(envs, "DST_STORAGE_MOUNT_NAME", i.DestinationMountName)
 
 	b := strings.Builder{}
 	for i := 0; i < len(envs)/2; i++ {

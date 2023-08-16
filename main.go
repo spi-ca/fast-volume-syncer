@@ -80,6 +80,20 @@ func main() {
 	consumedArgs++
 
 	switch action {
+	case "copy":
+		var (
+			srcPath, dstPath string
+		)
+		switch flags.NArg() {
+		case consumedArgs + 2:
+			srcPath = flags.Arg(consumedArgs + 0)
+			dstPath = flags.Arg(consumedArgs + 1)
+			consumedArgs += 2
+		default:
+			fmt.Println("required arguments missing")
+			usage()
+		}
+		entry.Copier(srcPath, dstPath)
 	case "sync":
 		var (
 			srcStoragePath,

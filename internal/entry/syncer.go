@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/copier"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
@@ -98,12 +99,17 @@ func Syncer(
 	)
 
 	runner := syncer.Runner{
-		Sandboxed: selectorInvoked && sandboxed && sandboxSupported,
-		Common: args.SyncerCommonArguments{
-			ReportEnabled:      viper.GetBool("report.enabled"),
-			SandboxMountOption: viper.GetString("sandbox.mount.option"),
-			FileMode:           sys.UnFilemodeStr(viper.GetString("file.mode")),
-			UseRsync:           viper.GetBool("rsync.enabled"),
+		Sandboxed:               selectorInvoked && sandboxed && sandboxSupported,
+		ReportEnabled:           viper.GetBool("report.enabled"),
+		SandboxMountOption:      viper.GetString("sandbox.mount.option"),
+		SourceMountHost:         viper.GetString("src.storage.mount.host"),
+		SourceMountOptions:      viper.GetString("src.storage.mount.option"),
+		SourceMountName:         viper.GetString("src.storage.mount.name"),
+		DestinationMountHost:    viper.GetString("dst.storage.mount.host"),
+		DestinationMountOptions: viper.GetString("dst.storage.mount.option"),
+		DestinationMountName:    viper.GetString("dst.storage.mount.name"),
+		Copier: copier.Runner{
+			FileMode: sys.UnFilemodeStr(viper.GetString("file.mode")),
 			Args: args.RsyncArgs{
 				Verbose:            viper.GetBool("rsync.verbose"),
 				Delete:             viper.GetBool("rsync.delete"),
@@ -116,17 +122,11 @@ func Syncer(
 				Recursive:          viper.GetBool("rsync.recursive"),
 				BandwidthLimit:     viper.GetString("rsync.bandwidth.limit"),
 			},
-
-			SourceMountHost:         viper.GetString("src.storage.mount.host"),
-			SourceMountOptions:      viper.GetString("src.storage.mount.option"),
-			SourceMountName:         viper.GetString("src.storage.mount.name"),
-			DestinationMountHost:    viper.GetString("dst.storage.mount.host"),
-			DestinationMountOptions: viper.GetString("dst.storage.mount.option"),
-			DestinationMountName:    viper.GetString("dst.storage.mount.name"),
-			ScanDuration:            viper.GetDuration("scan.deadline"),
-			FinderBinaryPath:        viper.GetString("scan.find.path"),
-			TaskSize:                viper.GetInt("task.size"),
-			ChunkSize:               viper.GetInt("chunk.size"),
+			UseRsync:         viper.GetBool("rsync.enabled"),
+			ScanDuration:     viper.GetDuration("scan.deadline"),
+			FinderBinaryPath: util.LookupBinary(viper.GetString("scan.find.path")),
+			TaskSize:         viper.GetInt("task.size"),
+			ChunkSize:        viper.GetInt("chunk.size"),
 			Retry: args.RetryArgs{
 				Attempts:  viper.GetInt("retry.attempts"),
 				Delay:     viper.GetDuration("retry.delay"),

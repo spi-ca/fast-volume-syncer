@@ -155,8 +155,15 @@ func TestScanner_executeFindCommand(t1 *testing.T) {
 	s := &Scanner{}
 	s.FinderBinaryPath = "find"
 	infoChan := make(chan returns.Fileinfo)
-	go s.executeFind(ctx, ".", infoChan)
+	errChan := make(chan error, 1)
+	go func() {
+		defer close(infoChan)
+		errChan <- s.executeFind(ctx, ".", infoChan)
+	}()
 	for entry := range infoChan {
 		log.Printf("entry %v", entry)
+	}
+	if err := <-errChan; err != nil {
+		t1.Fatal(err)
 	}
 }

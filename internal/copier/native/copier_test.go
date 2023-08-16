@@ -1,37 +1,35 @@
-package rsync
+package native
 
 import (
 	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 	"time"
 
 	"github.com/schollz/progressbar/v3"
 
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/args"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
-	"amuz.es/src/spi-ca/fast-volume-syncer/internal/syncer/find"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
+
+	"amuz.es/src/spi-ca/fast-volume-syncer/internal/copier/find"
 )
 
 func TestLogger(t *testing.T) {
+
 	bar := progressbar.NewOptions(1000,
 		progressbar.OptionSetWriter(util.LogWriter{}),
 		progressbar.OptionShowElapsedTimeOnFinish(),
-		progressbar.OptionOnCompletion(func() { log.Print("?") }),
 		progressbar.OptionShowCount(),
 		progressbar.OptionShowIts(),
 		progressbar.OptionSetWidth(15),
 		progressbar.OptionSetPredictTime(false),
 		progressbar.OptionThrottle(time.Second),
 		progressbar.OptionSetItsString("op"),
-		progressbar.OptionSetDescription(fmt.Sprintf("rsync[%d]", 33)),
+		progressbar.OptionSetDescription(fmt.Sprintf("[chk:%d]\t", 33)),
 		progressbar.OptionSetTheme(progressbar.Theme{
 			Saucer:        "-",
 			SaucerHead:    ">",
@@ -39,7 +37,6 @@ func TestLogger(t *testing.T) {
 			BarStart:      "[",
 			BarEnd:        "]",
 		}))
-
 	defer bar.Close()
 	for i := 0; i < 1000; i++ {
 		bar.Add(1)
@@ -47,49 +44,7 @@ func TestLogger(t *testing.T) {
 	}
 }
 
-func TestRsyncTask_Regex(t *testing.T) {
-	re := regexp.MustCompile(`^(.+?)( is uptodate)?$`)
-
-	line := "aaa"
-	matched := re.FindStringSubmatchIndex(line)
-	groups := (len(matched) / 2) - 1
-	log.Printf("matched %v", matched)
-	log.Printf("groups %d", groups)
-
-	match := func(i int) string {
-		if len(matched) < (i+1)*2 {
-			return ""
-		} else if matched[i*2] < 0 || matched[i*2+1] < 0 {
-			return ""
-		}
-
-		return line[matched[i*2]:matched[i*2+1]]
-	}
-	log.Printf("group(1) %s", match(1))
-
-	if len(match(2)) > 0 {
-		log.Printf("group(2) %s", match(2))
-	}
-
-}
-
-func TestRsyncArgs_assembleArgs(t *testing.T) {
-	args := args.RsyncArgs{
-		Verbose:            false,
-		Delete:             false,
-		PreservePermission: false,
-		PreserveOwnership:  false,
-		CopySpecial:        false,
-		Compress:           false,
-		WholeFile:          true,
-		Inplace:            false,
-		Recursive:          true,
-		BandwidthLimit:     "20m",
-	}
-	log.Print("format arguments", args.Assemble("src", "dst"))
-}
-
-func TestRsyncTask_Execute_find_method(t1 *testing.T) {
+func TestCopier_Execute_find_method(t1 *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -100,14 +55,13 @@ func TestRsyncTask_Execute_find_method(t1 *testing.T) {
 
 	src, err := os.MkdirTemp("", fmt.Sprintf(".tmp-%x", int64(os.Getpid())^time.Now().Unix()))
 	if err != nil {
-		panic(fmt.Errorf("failed to create a tempfile :%w", err))
+		panic(fmt.Errorf("failed to create a tempfile :%w; %w", ErrCopierCopyFailed, err))
 	}
-
 	defer os.RemoveAll(src)
 	t1.Log("source directory created ", src)
 	dst, err := os.MkdirTemp("", fmt.Sprintf(".tmp-%x", int64(os.Getpid())^time.Now().Unix()))
 	if err != nil {
-		panic(fmt.Errorf("failed to create a tempfile :%w", err))
+		panic(fmt.Errorf("failed to create a tempfile :%w; %w", ErrCopierCopyFailed, err))
 	}
 	defer os.RemoveAll(dst)
 	t1.Log("destination directory created ", dst)
@@ -154,10 +108,10 @@ func TestRsyncTask_Execute_find_method(t1 *testing.T) {
 
 	infoChan, scannerErrorChan := s.Scan(ctx, src)
 	var (
-		t = &Task{
+		t = &Copier{
+			SourceRoot:      src,
+			DestinationRoot: dst,
 			FileMode:        0o640,
-			SourcePath:      src,
-			DestinationPath: dst,
 		}
 		files []returns.Fileinfo
 	)
@@ -173,7 +127,7 @@ func TestRsyncTask_Execute_find_method(t1 *testing.T) {
 	}
 }
 
-func TestRsyncTask_Execute_scan_method(t1 *testing.T) {
+func TestCopier_Execute_scan_method(t1 *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -183,14 +137,13 @@ func TestRsyncTask_Execute_scan_method(t1 *testing.T) {
 
 	src, err := os.MkdirTemp("", fmt.Sprintf(".tmp-%x", int64(os.Getpid())^time.Now().Unix()))
 	if err != nil {
-		panic(fmt.Errorf("failed to create a tempfile :%w", err))
+		panic(fmt.Errorf("failed to create a tempfile :%w; %w", ErrCopierCopyFailed, err))
 	}
-
 	defer os.RemoveAll(src)
 	t1.Log("source directory created ", src)
 	dst, err := os.MkdirTemp("", fmt.Sprintf(".tmp-%x", int64(os.Getpid())^time.Now().Unix()))
 	if err != nil {
-		panic(fmt.Errorf("failed to create a tempfile :%w", err))
+		panic(fmt.Errorf("failed to create a tempfile :%w; %w", ErrCopierCopyFailed, err))
 	}
 	defer os.RemoveAll(dst)
 	t1.Log("destination directory created ", dst)
@@ -237,10 +190,10 @@ func TestRsyncTask_Execute_scan_method(t1 *testing.T) {
 
 	infoChan, scannerErrorChan := s.Scan(ctx, src)
 	var (
-		t = &Task{
+		t = &Copier{
+			SourceRoot:      src,
+			DestinationRoot: dst,
 			FileMode:        0o640,
-			SourcePath:      src,
-			DestinationPath: dst,
 		}
 		files []returns.Fileinfo
 	)
