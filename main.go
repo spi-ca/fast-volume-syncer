@@ -199,6 +199,7 @@ func usage() {
 		"\t%s start [NODE_SELECTOR:%d] [COPY_INFO_CSV_PATH:%s]\n"+
 		"\t%s stop \nargs:\n",
 		name,
+		name,
 		name, defaultNodeSelector, defaultCSVFilename,
 		name, defaultNodeSelector, defaultCSVFilename,
 		name,
