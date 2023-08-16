@@ -193,6 +193,7 @@ func main() {
 
 func usage() {
 	fmt.Printf("usage: \n"+
+		"\t%s copy SRC_PATH DST_PATH\n"+
 		"\t%s sync SRC_PATH [SRC_SUBPATH] DST_PATH [DST_SUBPATH]\n"+
 		"\t%s select [NODE_SELECTOR:%d] [COPY_INFO_CSV_PATH:%s]\n"+
 		"\t%s start [NODE_SELECTOR:%d] [COPY_INFO_CSV_PATH:%s]\n"+
