@@ -45,7 +45,6 @@ RUN set -xeu && \
     ca-certificates \
     dstat \
     git && \
-    update-ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -63,9 +62,6 @@ RUN set -xeu && \
     echo 'bc-user ALL=(root) NOPASSWD:ALL' > /etc/sudoers.d/bc-user && \
     chmod 0440 "/etc/sudoers.d/bc-user" && \
     chown -R bc-user:bc-user "/home/bc-user"
-
-RUN set -xeu && \
-
 
 USER bc-user:bc-user
 WORKDIR /home/bc-user
