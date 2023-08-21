@@ -4,7 +4,7 @@
 ## Build
 ##
 #FROM docker.io/library/golang:1.21.0-alpine AS build
-FROM public.ecr.aws/docker/library/golang:1.21.0-alpine AS build
+FROM public.ecr.aws/docker/library/golang:1.21.0 AS build
 
 WORKDIR /build
 
@@ -20,32 +20,41 @@ RUN set -xe && \
 ## Deploy
 ##
 #FROM docker.io/library/alpine:3.14
-FROM public.ecr.aws/docker/library/alpine:3.14
+FROM public.ecr.aws/docker/library/debian:sid-slim
 LABEL maintainer="Sangbum Kim <sangbumkim@amuz.es>"
 COPY --from=build /build/fast-volume-syncer /usr/local/bin/fast-volume-syncer
 
 ARG UID=1111
 ARG GID=1111
 
-RUN set -x && \
-    apk --no-cache add \
-    bash \
-    nano \
-    ca-certificates \
-    tini \
-    gettext \
-    git \
+RUN set -xeu && \
+    apt update && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt install -y --no-install-recommends \
     curl \
-    gnupg && \
-    addgroup -g $GID bc-user && \
-    adduser -S -D -h /home/bc-user -s /bin/bash -G bc-user -u $GID bc-user && \
-    apk --purge del apk-tools &&\
-    rm -rvf \
-        /etc/apk        \
-        /sbin/apk       \
-        /var/cache/apk  \
-        /usr/share/apk \
+    bash \
+    iproute2 \
+    tini \
+    gnupg \
+    git && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+
+RUN set -xeu && \
+    addgroup --gid 1000 bc-user && \
+    adduser \
+    --disabled-login \
+    --home "/home/bc-user" \
+    --gecos "" \
+    --shell /bin/bash \
+    --gid $UID \
+    --uid $GID \
+    "bc-user" && \
+    echo 'bc-user ALL=(root) NOPASSWD:ALL' > /etc/sudoers.d/spawning-pool && \
+    chmod 0440 "/etc/sudoers.d/bc-user" && \
+    chown -R bc-user:bc-user "/home/bc-user"
 
 USER bc-user:bc-user
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ENTRYPOINT [ "/sbin/tini", "-s", "--", "fast-volume-syncer" ]
+ENTRYPOINT [ "/usr/bin/tini", "-s", "--", "fast-volume-syncer" ]
