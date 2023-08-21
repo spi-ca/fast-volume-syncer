@@ -43,16 +43,16 @@ RUN set -xeu && \
 
 
 RUN set -xeu && \
-    addgroup --gid 1000 bc-user && \
+    addgroup --gid $GID bc-user && \
     adduser \
     --disabled-login \
     --home "/home/bc-user" \
     --gecos "" \
     --shell /bin/bash \
-    --gid $UID \
-    --uid $GID \
+    --gid $GID \
+    --uid $UID \
     "bc-user" && \
-    echo 'bc-user ALL=(root) NOPASSWD:ALL' > /etc/sudoers.d/spawning-pool && \
+    echo 'bc-user ALL=(root) NOPASSWD:ALL' > /etc/sudoers.d/bc-user && \
     chmod 0440 "/etc/sudoers.d/bc-user" && \
     chown -R bc-user:bc-user "/home/bc-user"
 
