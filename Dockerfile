@@ -37,6 +37,7 @@ RUN set -xeu && \
     iproute2 \
     tini \
     gnupg \
+    sudo \
     git && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
