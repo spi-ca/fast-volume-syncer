@@ -14,7 +14,8 @@ COPY main.go go.mod go.sum ./
 RUN set -xe && \
     go mod download && \
     go mod verify && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o fast-volume-syncer .
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o fast-volume-syncer . && \
+
 
 ##
 ## Deploy
@@ -56,5 +57,6 @@ RUN set -xeu && \
     chown -R bc-user:bc-user "/home/bc-user"
 
 USER bc-user:bc-user
+WORKDIR /home/bc-user
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ENTRYPOINT [ "/usr/bin/tini", "-s", "--", "fast-volume-syncer" ]
