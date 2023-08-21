@@ -37,6 +37,8 @@ RUN set -xeu && \
     bash \
     iproute2 \
     aptitude \
+    strace \
+    lsof \
     tini \
     gnupg \
     sudo \
