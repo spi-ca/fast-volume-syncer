@@ -24,6 +24,7 @@ RUN set -xe && \
 FROM public.ecr.aws/docker/library/debian:sid-slim
 LABEL maintainer="Sangbum Kim <sangbumkim@amuz.es>"
 COPY --from=build /build/fast-volume-syncer /usr/local/bin/fast-volume-syncer
+COPY contrib/bc-script/org_secure.sh /etc/profile.d/org_secure.sh
 
 ARG UID=1111
 ARG GID=1111
@@ -35,10 +36,16 @@ RUN set -xeu && \
     curl \
     bash \
     iproute2 \
+    aptitude \
     tini \
     gnupg \
     sudo \
+    htop \
+    rclone \
+    ca-certificates \
+    dstat \
     git && \
+    update-ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -56,6 +63,9 @@ RUN set -xeu && \
     echo 'bc-user ALL=(root) NOPASSWD:ALL' > /etc/sudoers.d/bc-user && \
     chmod 0440 "/etc/sudoers.d/bc-user" && \
     chown -R bc-user:bc-user "/home/bc-user"
+
+RUN set -xeu && \
+
 
 USER bc-user:bc-user
 WORKDIR /home/bc-user
