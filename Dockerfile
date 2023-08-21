@@ -27,9 +27,6 @@ COPY --from=build /build/fast-volume-syncer /usr/local/bin/fast-volume-syncer
 ARG UID=1111
 ARG GID=1111
 
-COPY --from=build /opt/gitea /opt/gitea
-WORKDIR /opt/gitea
-
 RUN set -x && \
     apk --no-cache add \
     bash \
