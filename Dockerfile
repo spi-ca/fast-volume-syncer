@@ -25,6 +25,7 @@ FROM public.ecr.aws/docker/library/debian:sid-slim
 LABEL maintainer="Sangbum Kim <sangbumkim@amuz.es>"
 COPY --from=build /build/fast-volume-syncer /usr/local/bin/fast-volume-syncer
 COPY contrib/bc-script/org_secure.sh /etc/profile.d/org_secure.sh
+COPY contrib/fsmon /usr/local/bin/fsmon
 
 ARG UID=1111
 ARG GID=1111
