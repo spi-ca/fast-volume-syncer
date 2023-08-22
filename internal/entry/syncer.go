@@ -45,13 +45,14 @@ func Syncer(
 	if daemonized || selectorInvoked {
 		util.SetLogFlags(0)
 	} else {
-		util.InfoLog.SetPrefix(fmt.Sprintf("[%d]&1>", os.Getpid()))
-		util.ErrLog.SetPrefix(fmt.Sprintf("[%d]&2>", os.Getpid()))
+		util.InfoLog.SetPrefix(fmt.Sprintf("%s[%d]&1>", viper.GetString("log.prefix"), os.Getpid()))
+		util.ErrLog.SetPrefix(fmt.Sprintf("%s[%d]&2>", viper.GetString("log.prefix"), os.Getpid()))
 	}
 
 	// debug
 	util.InfoLog.Print(
 		"args:",
+		"\n	log.prefix=", viper.GetString("log.prefix"),
 		"\n	report.enabled=", viper.GetBool("report.enabled"),
 		"\n	sandbox.mount.option=", viper.GetString("sandbox.mount.option"),
 		"\n	file.mode=", viper.GetString("file.mode"),

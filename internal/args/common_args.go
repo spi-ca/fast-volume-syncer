@@ -8,7 +8,8 @@ import (
 )
 
 type CopierCommonArguments struct {
-	FileMode os.FileMode
+	FileMode  os.FileMode
+	LogPrefix string
 
 	Args RsyncArgs
 
@@ -26,6 +27,7 @@ func (i *CopierCommonArguments) AssembleEnvironment(inherited []string) []string
 	envs := make([]string, 0, 20*2)
 
 	envs = append(envs, "FILE_MODE", i.FileMode.String())
+	envs = append(envs, "LOG_PREFIX", i.LogPrefix)
 	envs = append(envs, "RSYNC_ENABLED", strconv.FormatBool(i.UseRsync))
 	envs = append(envs, "RSYNC_VERBOSE", strconv.FormatBool(i.Args.Verbose))
 	envs = append(envs, "RSYNC_DELETE", strconv.FormatBool(i.Args.Delete))

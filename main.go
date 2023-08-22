@@ -34,6 +34,7 @@ func init() {
 	flags.Bool("sandbox-disabled", false, "(selector only)without namespace isolation")
 	flags.IntP("worker-size", "w", 5, "(selector only)specifies the maximum number of syncer processes that can run concurrently")
 	flags.Bool("report-enabled", false, "do list files")
+	flags.String("log-prefix", "", "append log prefix")
 
 	flags.String("sandbox-mount-option", "size=150M,mode=700,nosuid,noexec,nodev", "(selector only)sandbox mount option")
 	flags.String("file-mode", "-rw-------", "setting with default filemode")

@@ -40,6 +40,7 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 		"args:",
 		"\n	pid.file=", viper.GetString("pid.file"),
 		"\n	log.file=", viper.GetString("log.file"),
+		"\n	log.prefix=", viper.GetString("log.prefix"),
 		"\n	report.enabled=", viper.GetBool("report.enabled"),
 		"\n	sandbox.disabled=", viper.GetString("sandbox.disabled"),
 		"\n	sandbox.mount.option=", viper.GetString("sandbox.mount.option"),
@@ -92,7 +93,8 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 			DestinationMountOptions: viper.GetString("dst.storage.mount.option"),
 			DestinationMountName:    viper.GetString("dst.storage.mount.name"),
 			Common: args.CopierCommonArguments{
-				FileMode: sys.UnFilemodeStr(viper.GetString("file.mode")),
+				LogPrefix: viper.GetString("log.file"),
+				FileMode:  sys.UnFilemodeStr(viper.GetString("file.mode")),
 				Args: args.RsyncArgs{
 					Verbose:            viper.GetBool("rsync.verbose"),
 					Delete:             viper.GetBool("rsync.delete"),

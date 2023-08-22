@@ -37,17 +37,17 @@ func Copier(srcPath, dstPath string) {
 
 	daemonized, _ := strconv.ParseBool(os.Getenv("_FVS_DAEMONEZED"))
 	selectorInvoked, _ := strconv.ParseBool(os.Getenv("_SYNCER_INVOKED"))
-
 	if daemonized || selectorInvoked {
 		util.SetLogFlags(0)
 	} else {
-		util.InfoLog.SetPrefix(fmt.Sprintf("[%d]&1>", os.Getpid()))
-		util.ErrLog.SetPrefix(fmt.Sprintf("[%d]&2>", os.Getpid()))
+		util.InfoLog.SetPrefix(fmt.Sprintf("%s[%d]&1>", viper.GetString("log.prefix"), os.Getpid()))
+		util.ErrLog.SetPrefix(fmt.Sprintf("%s[%d]&2>", viper.GetString("log.prefix"), os.Getpid()))
 	}
 
 	// debug
 	util.InfoLog.Print(
 		"args:",
+		"\n	log.prefix=", viper.GetString("log.prefix"),
 		"\n	file.mode=", viper.GetString("file.mode"),
 		"\n	rsync.enabled=", viper.GetBool("rsync.enabled"),
 		"\n	rsync.delete=", viper.GetBool("rsync.delete"),

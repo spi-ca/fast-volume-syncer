@@ -43,11 +43,12 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 
 	daemonized, _ := strconv.ParseBool(os.Getenv("_FVS_DAEMONEZED"))
 
-	util.InfoLog.SetPrefix("&1>")
-	util.ErrLog.SetPrefix("&2>")
+	util.InfoLog.SetPrefix(fmt.Sprintf("%s&1>", viper.GetString("log.prefix")))
+	util.ErrLog.SetPrefix(fmt.Sprintf("%s&2>", viper.GetString("log.prefix")))
 
 	util.InfoLog.Print(
 		"args:",
+		"\n	log.prefix=", viper.GetString("log.prefix"),
 		"\n	report.enabled=", viper.GetBool("report.enabled"),
 		"\n	sandbox.disabled=", viper.GetString("sandbox.disabled"),
 		"\n	sandbox.mount.option=", viper.GetString("sandbox.mount.option"),
@@ -118,7 +119,8 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 				DestinationMountName:    viper.GetString("dst.storage.mount.name"),
 
 				Common: args.CopierCommonArguments{
-					FileMode: sys.UnFilemodeStr(viper.GetString("file.mode")),
+					LogPrefix: viper.GetString("log.file"),
+					FileMode:  sys.UnFilemodeStr(viper.GetString("file.mode")),
 					Args: args.RsyncArgs{
 						Verbose:            viper.GetBool("rsync.verbose"),
 						Delete:             viper.GetBool("rsync.delete"),
