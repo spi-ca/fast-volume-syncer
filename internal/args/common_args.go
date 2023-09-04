@@ -38,6 +38,7 @@ func (i *CopierCommonArguments) AssembleEnvironment(inherited []string) []string
 	envs = append(envs, "RSYNC_WHOLE_FILE", strconv.FormatBool(i.Args.WholeFile))
 	envs = append(envs, "RSYNC_INPLACE", strconv.FormatBool(i.Args.Inplace))
 	envs = append(envs, "RSYNC_RECURSIVE", strconv.FormatBool(i.Args.Recursive))
+	envs = append(envs, "RSYNC_PORT", strconv.Itoa(i.Args.Port))
 	envs = append(envs, "RSYNC_BANDWIDTH_LIMIT", i.Args.BandwidthLimit)
 
 	envs = append(envs, "SCAN_DEADLINE", i.ScanDuration.String())

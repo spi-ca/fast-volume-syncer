@@ -117,24 +117,7 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList [
 	w := bufio.NewWriter(writer)
 	addSep := false
 	for _, entry := range fileList {
-		mode := entry.Mode
-		if mode.IsDir() {
-			// ensure mode
-			dirMode := mode.Perm() | t.FileMode.Perm()
-			dirPath := filepath.Join(t.DestinationPath, entry.Path)
-			err := t.processDirectory(dirPath, dirMode)
-			if err != nil {
-				util.ErrLog.Print(err)
-				continue
-			}
-		} else if mode.Type()&fs.ModeSymlink != 0 {
-			linkPath := filepath.Join(t.DestinationPath, entry.Path)
-			err := t.processSymbolicLink(entry.SymlinkPath, linkPath)
-			if err != nil {
-				util.ErrLog.Print(err)
-				continue
-			}
-		} else if mode.IsRegular() {
+		if t.Arguments.Port > 0 {
 			if addSep {
 				_ = w.WriteByte('\n')
 			} else {
@@ -143,7 +126,34 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList [
 			_, _ = w.WriteString(entry.Path)
 			_ = w.Flush()
 		} else {
-			util.ErrLog.Printf("skip filepath %s, unexpected filemode(%s)", entry.Path, entry.Mode)
+			mode := entry.Mode
+			if mode.IsDir() {
+				// ensure mode
+				dirMode := mode.Perm() | t.FileMode.Perm()
+				dirPath := filepath.Join(t.DestinationPath, entry.Path)
+				err := t.processDirectory(dirPath, dirMode)
+				if err != nil {
+					util.ErrLog.Print(err)
+					continue
+				}
+			} else if mode.Type()&fs.ModeSymlink != 0 {
+				linkPath := filepath.Join(t.DestinationPath, entry.Path)
+				err := t.processSymbolicLink(entry.SymlinkPath, linkPath)
+				if err != nil {
+					util.ErrLog.Print(err)
+					continue
+				}
+			} else if mode.IsRegular() {
+				if addSep {
+					_ = w.WriteByte('\n')
+				} else {
+					addSep = true
+				}
+				_, _ = w.WriteString(entry.Path)
+				_ = w.Flush()
+			} else {
+				util.ErrLog.Printf("skip filepath %s, unexpected filemode(%s)", entry.Path, entry.Mode)
+			}
 		}
 	}
 

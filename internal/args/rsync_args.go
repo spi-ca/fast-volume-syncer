@@ -1,6 +1,9 @@
 package args
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 type RsyncArgs struct {
 	Verbose            bool
@@ -12,6 +15,7 @@ type RsyncArgs struct {
 	WholeFile          bool
 	Inplace            bool
 	Recursive          bool
+	Port               int
 	BandwidthLimit     string
 }
 
@@ -95,6 +99,10 @@ func (a RsyncArgs) Assemble(src, dst string) []string {
 	} else {
 		args = append(args, "--no-recursive")
 		args = append(args, "--files-from=-")
+	}
+
+	if a.Port > 0 {
+		args = append(args, "--port", strconv.Itoa(a.Port))
 	}
 
 	if len(a.BandwidthLimit) > 0 {

@@ -48,6 +48,7 @@ func init() {
 	flags.Bool("rsync-whole-file", false, "disable delta xfer of rsync")
 	flags.Bool("rsync-inplace", false, "write file directly info destination path")
 	flags.Bool("rsync-recursive", false, "disable chunk xfer")
+	flags.IntP("rsync-port", "p", 0, "specify rsync port")
 	flags.String("rsync-bandwidth-limit", "", "specify bandwidth limitation")
 	flags.String("src-storage-mount-host", "192.0.2.10", "source storage host")
 	flags.String("src-storage-mount-option", "ro,nodiratime,noatime,vers=3,rsize=524288,wsize=524288,hard,intr,nolock,proto=tcp,timeo=600,retrans=2,sec=sys", "source mount option")
