@@ -3,6 +3,7 @@ package native
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"strings"
 	"time"
@@ -16,13 +17,20 @@ type result struct {
 	lastFilenames [10]string
 	total         int
 	sent          int
-	processed     int
-	uptodate      int
-	disappeared   int
-	skipped       int
-	sentBytes     int64
-	started       time.Time
-	errs          []error
+
+	files       int
+	links       int
+	directories int
+
+	processed   int
+	uptodate    int
+	disappeared int
+	skipped     int
+	sentBytes   int64
+
+	started, ended time.Time
+
+	errs []error
 }
 
 func (r *result) appendFilename(filename string) {
@@ -41,13 +49,37 @@ func (r *result) listFilename() []string {
 	return filenames
 }
 
-func (r *result) String() string {
+func (r *result) addTypeCount(mode fs.FileMode) {
+	if mode.IsDir() {
+		r.directories++
+	} else if mode.Type()&fs.ModeSymlink != 0 {
+		r.links++
+	} else if mode.IsRegular() {
+		r.files++
+	}
+}
+func (r *result) markEnd() { r.ended = time.Now() }
+
+func (r result) Duration() time.Duration {
+	if r.ended.After(r.started) {
+		return r.ended.Sub(r.started)
+	} else {
+		return 0
+	}
+}
+func (r result) Total() int64       { return int64(r.total) }
+func (r result) Files() int64       { return int64(r.files) }
+func (r result) Links() int64       { return int64(r.links) }
+func (r result) Directories() int64 { return int64(r.directories) }
+func (r result) SentBytes() int64   { return r.sentBytes }
+
+func (r result) String() string {
 	buf := &strings.Builder{}
 
 	_, _ = fmt.Fprintf(buf, "[chk:%d]", r.chunkIdx)
 
 	if !r.started.IsZero() {
-		elapsed := time.Now().Sub(r.started)
+		elapsed := time.Since(r.started)
 		_, _ = fmt.Fprintf(buf, " in %2.2f ms", float32(elapsed.Microseconds())/1000)
 		if r.sentBytes > 0 {
 			buf.WriteString(" sent ")

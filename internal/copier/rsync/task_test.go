@@ -173,7 +173,7 @@ func TestRsyncTask_Execute_find_method(t1 *testing.T) {
 	for entry := range infoChan {
 		files = append(files, entry)
 	}
-	err = t.Execute(ctx, files)
+	_, err = t.Execute(ctx, files)
 	if err != nil {
 		panic(err)
 	}
@@ -257,7 +257,7 @@ func TestRsyncTask_Execute_scan_method(t1 *testing.T) {
 	for entry := range infoChan {
 		files = append(files, entry)
 	}
-	err = t.Execute(ctx, files)
+	_, err = t.Execute(ctx, files)
 	if err != nil {
 		panic(err)
 	}

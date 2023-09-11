@@ -2,6 +2,7 @@ package rsync
 
 import (
 	"fmt"
+	"io/fs"
 	"math"
 	"os/exec"
 	"strings"
@@ -52,17 +53,37 @@ type result struct {
 	startIdx      int
 	lastFilenames [10]string
 	total         int
-	sent          int
-	processing    int
-	uptodate      int
-	sentBytes     int64
-	pid           int
-	err           error
-	started       time.Time
+
+	files       int
+	links       int
+	directories int
+
+	sent      int
+	processed int
+	uptodate  int
+	sentBytes int64
+	pid       int
+
+	started, ended time.Time
+
+	err error
 
 	stderrLastLogLineStartIdx int
 	stderrLastLogLines        [10]string
 }
+
+func (r result) Duration() time.Duration {
+	if r.ended.After(r.started) {
+		return r.ended.Sub(r.started)
+	} else {
+		return 0
+	}
+}
+func (r result) Total() int64       { return int64(r.total) }
+func (r result) Files() int64       { return int64(r.files) }
+func (r result) Links() int64       { return int64(r.links) }
+func (r result) Directories() int64 { return int64(r.directories) }
+func (r result) SentBytes() int64   { return r.sentBytes }
 
 func (r *result) appendLogLine(line string) {
 	r.stderrLastLogLines[r.stderrLastLogLineStartIdx] = line
@@ -96,7 +117,18 @@ func (r *result) listFilename() []string {
 	return filenames
 }
 
-func (r *result) String() string {
+func (r *result) addTypeCount(mode fs.FileMode) {
+	if mode.IsDir() {
+		r.directories++
+	} else if mode.Type()&fs.ModeSymlink != 0 {
+		r.links++
+	} else if mode.IsRegular() {
+		r.files++
+	}
+}
+func (r *result) markEnd() { r.ended = time.Now() }
+
+func (r result) String() string {
 	buf := &strings.Builder{}
 
 	_, _ = fmt.Fprintf(buf, "[chk:%d]rsync(%d)", r.chunkIdx, r.pid)
@@ -107,7 +139,7 @@ func (r *result) String() string {
 	}
 
 	if !r.started.IsZero() {
-		elapsed := time.Now().Sub(r.started)
+		elapsed := time.Since(r.started)
 		_, _ = fmt.Fprintf(buf, " in %2.2f ms", float32(elapsed.Microseconds())/1000)
 		if r.sentBytes > 0 {
 			buf.WriteString(" sent ")
@@ -124,8 +156,8 @@ func (r *result) String() string {
 		buf.WriteString(util.FileSizeIEC(r.sentBytes))
 	}
 	if r.total > 0 {
-		_, _ = fmt.Fprintf(buf, " total(%d) = sent(%d) + uptodate(%d) + untouched(%d), processing(%d)",
-			r.total, r.sent, r.uptodate, r.total-r.sent-r.uptodate, r.processing,
+		_, _ = fmt.Fprintf(buf, " total(%d) = sent(%d) + uptodate(%d) + untouched(%d), processed(%d)",
+			r.total, r.sent, r.uptodate, r.total-r.sent-r.uptodate, r.processed,
 		)
 	}
 	if err != nil {

@@ -76,12 +76,19 @@ func (r *Runner) Execute(ctx context.Context, sourcePath string, destinationPath
 	}
 
 	entryChan, scannerErrorChan := scanner.Scan(ctx, sourcePath)
-	joinerErrorChan := joiner.Execute(ctx, entryChan)
+	ioResultChan := joiner.Execute(ctx, entryChan)
 
-	var errs []error
+	var (
+		errs   []error
+		result ioResult
+	)
 
-	for joinerErr := range joinerErrorChan {
-		errs = append(errs, joinerErr)
+	for ioResult := range ioResultChan {
+		result.Append(ioResult.Result)
+		util.InfoLog.Printf("[acc]copy processed: %s", result)
+		if ioResult.Error != nil {
+			errs = append(errs, fmt.Errorf("chunk processing failed : %w", err))
+		}
 	}
 
 	if scannerErr, ok := <-scannerErrorChan; ok {
@@ -90,10 +97,12 @@ func (r *Runner) Execute(ctx context.Context, sourcePath string, destinationPath
 	err = errors.Join(errs...)
 
 	if err == nil && ctx.Err() == nil {
-		util.InfoLog.Printf("copy complete! (%s->%s)", sourcePath, destinationPath)
+		util.InfoLog.Printf("copy complete! (%s->%s), processed: %s", sourcePath, destinationPath, result)
+	} else {
+		util.InfoLog.Printf("copy stopped(%s->%s), processed: %s", sourcePath, destinationPath, result)
 	}
-	return err
 
+	return err
 }
 
 func (r *Runner) prepareDirectory(sourcePath string, destinationPath string) (string, string, error) {

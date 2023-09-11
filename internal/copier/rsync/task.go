@@ -41,21 +41,26 @@ type Task struct {
 	chunkIdx        uint64
 }
 
-func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
+func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) (result returns.IOResult, err error) {
 
+	chunkIdx := atomic.AddUint64(&t.chunkIdx, 1)
 	if t.Retry.Attempts <= 0 {
-		return t.execute(ctx, fileList)
+		return t.execute(ctx, chunkIdx, fileList)
 	}
 
 	retryOptionArgs := t.Retry.Assemble(ctx)
-	retryFunc := func() error { return t.execute(ctx, fileList) }
-	return retry.Do(retryFunc, retryOptionArgs...)
+	return result, retry.Do(func() (retryErr error) {
+		result, retryErr = t.execute(ctx, chunkIdx, fileList)
+		return
+	}, retryOptionArgs...)
 }
 
-func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinfo) error {
-	chunkIdx := atomic.AddUint64(&t.chunkIdx, 1)
+func (t *Task) execute(parentContext context.Context, chunkIdx uint64, fileList []returns.Fileinfo) (returns.IOResult, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	res := &result{chunkIdx: chunkIdx, total: len(fileList), started: time.Now()}
+	defer res.markEnd()
 
 	invoke := exec.CommandContext(
 		ctx,
@@ -67,7 +72,7 @@ func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinf
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
 	if err := sys.ApplySysProAttrPdeathsig(invoke.SysProcAttr, syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to set pdeathsig(%s): %w", syscall.SIGTERM, err)
+		return res, fmt.Errorf("failed to set pdeathsig(%s): %w", syscall.SIGTERM, err)
 	}
 
 	stdin, _ := invoke.StdinPipe()
@@ -81,9 +86,10 @@ func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinf
 	defer runtime.UnlockOSThread()
 
 	if err := invoke.Start(); err != nil {
-		return fmt.Errorf("failed to start process(rsync): %w", err)
+		return res, fmt.Errorf("failed to start process(rsync): %w", err)
 	}
-	res := &result{chunkIdx: chunkIdx, total: len(fileList), started: time.Now(), pid: invoke.Process.Pid}
+
+	res.pid = invoke.Process.Pid
 
 	go func() {
 		select {
@@ -101,7 +107,7 @@ func (t *Task) execute(parentContext context.Context, fileList []returns.Fileinf
 	res.err = invoke.Wait()
 	wg.Wait()
 	util.InfoLog.Print(res)
-	return res.HandleError()
+	return res, res.HandleError()
 }
 
 func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList []returns.Fileinfo) {
@@ -223,14 +229,15 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, closer func(), f
 		}
 		path := string(match(1))
 		if idx, contains := filenameSet[path]; !contains {
-			res.processing++
+			res.processed++
 			continue
 		} else {
+			info := fileList[idx]
 			res.appendFilename(path)
+			res.addTypeCount(info.Mode)
 			if len(match(2)) == 0 {
-				info := fileList[idx]
 				res.sent++
-				res.sentBytes += info.Size // * 1024
+				res.sentBytes += info.Size
 			} else {
 				res.uptodate++
 			}

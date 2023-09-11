@@ -40,19 +40,26 @@ type Copier struct {
 	chunkIdx        uint64
 }
 
-func (c *Copier) Execute(ctx context.Context, fileList []returns.Fileinfo) error {
+func (c *Copier) Execute(ctx context.Context, fileList []returns.Fileinfo) (result returns.IOResult, err error) {
+	var (
+		chunkIdx = atomic.AddUint64(&c.chunkIdx, 1)
+	)
+
 	if c.Retry.Attempts <= 0 {
-		return c.execute(ctx, fileList)
+		return c.execute(ctx, chunkIdx, fileList)
 	}
 
 	retryOptionArgs := c.Retry.Assemble(ctx)
-	retryFunc := func() error { return c.execute(ctx, fileList) }
-	return retry.Do(retryFunc, retryOptionArgs...)
+
+	return result, retry.Do(func() (retryErr error) {
+		result, retryErr = c.execute(ctx, chunkIdx, fileList)
+		return
+	}, retryOptionArgs...)
 }
 
-func (c *Copier) execute(ctx context.Context, fileList []returns.Fileinfo) error {
-	chunkIdx := atomic.AddUint64(&c.chunkIdx, 1)
+func (c *Copier) execute(ctx context.Context, chunkIdx uint64, fileList []returns.Fileinfo) (returns.IOResult, error) {
 	res := &result{chunkIdx: chunkIdx, total: len(fileList), started: time.Now()}
+	defer res.markEnd()
 
 	bar := progressbar.NewOptions(res.total,
 		progressbar.OptionSetWriter(util.LogWriter{}),
@@ -80,6 +87,8 @@ forLoop:
 		_ = bar.Add(1)
 		res.appendFilename(entry.Path)
 		if err == nil {
+			res.addTypeCount(entry.Mode)
+
 			if copied >= 0 {
 				res.sentBytes += copied
 				res.sent++
@@ -90,10 +99,12 @@ forLoop:
 			err = nil
 			break forLoop
 		} else if errors.Is(err, ErrCopierUptodate) {
+			res.addTypeCount(entry.Mode)
 			res.uptodate++
 		} else if errors.Is(err, ErrCopierSrcNotExist) {
 			res.disappeared++
 		} else if errors.Is(err, ErrCopierSkipped) {
+			res.addTypeCount(entry.Mode)
 			res.skipped++
 		} else if errors.Is(err, ErrCopierDstNoSpace) {
 			res.errs = append(res.errs, err)
@@ -110,7 +121,7 @@ forLoop:
 	} else if unrecoverable {
 		err = retry.Unrecoverable(err)
 	}
-	return err
+	return res, err
 }
 
 func (c *Copier) routeFileByTypes(ctx context.Context, chunkIdx uint64, srcInfo returns.Fileinfo) (int64, error) {

@@ -2,7 +2,6 @@ package copier
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 )
 
 type (
-	copyMethod  func(context.Context, []returns.Fileinfo) error
+	copyMethod  func(context.Context, []returns.Fileinfo) (returns.IOResult, error)
 	chunkJoiner struct {
 		taskSize  int
 		chunkSize int
@@ -21,15 +20,20 @@ type (
 		copier       copyMethod
 		scanDuration time.Duration
 	}
+
+	chunkResult struct {
+		Result returns.IOResult
+		Error  error
+	}
 )
 
-func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.Fileinfo) <-chan error {
-	errorChan := make(chan error, c.taskSize)
-	go c.dispatch(ctx, entryRecvChan, errorChan)
-	return errorChan
+func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.Fileinfo) <-chan chunkResult {
+	resultChan := make(chan chunkResult, c.taskSize)
+	go c.dispatch(ctx, entryRecvChan, resultChan)
+	return resultChan
 }
 
-func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns.Fileinfo, errorChan chan<- error) {
+func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns.Fileinfo, resultChan chan<- chunkResult) {
 	sem := semaphore.NewWeighted(int64(c.taskSize))
 	deadline := time.NewTicker(c.scanDuration)
 	defer func() {
@@ -37,7 +41,7 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 			util.ErrLog.Printf("panic on chunkJoiner: %v", err)
 		}
 		_ = sem.Acquire(context.Background(), int64(c.taskSize))
-		close(errorChan)
+		close(resultChan)
 		deadline.Stop()
 	}()
 
@@ -89,7 +93,7 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 		if len(chunk) > 0 {
 			// context문제가 있을때만 error 발생.
 			if err := sem.Acquire(ctx, 1); err == nil {
-				go c.submit(ctx, taskCloser, chunk, errorChan)
+				go c.submit(ctx, taskCloser, chunk, resultChan)
 			} else {
 				chunkPool.Put(chunk[0:0])
 				ended = true
@@ -99,10 +103,9 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 	}
 }
 
-func (c *chunkJoiner) submit(ctx context.Context, closer func([]returns.Fileinfo), chunk []returns.Fileinfo, errorChan chan<- error) {
+func (c *chunkJoiner) submit(ctx context.Context, closer func([]returns.Fileinfo), chunk []returns.Fileinfo, resultChan chan<- chunkResult) {
 	defer closer(chunk)
-	err := c.copier(ctx, chunk)
-	if err != nil {
-		errorChan <- fmt.Errorf("chunk processing failed : %w", err)
-	}
+	res := chunkResult{}
+	res.Result, res.Error = c.copier(ctx, chunk)
+	resultChan <- res
 }
