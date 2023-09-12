@@ -87,7 +87,7 @@ func (r *Runner) Execute(ctx context.Context, sourcePath string, destinationPath
 		result.Append(ioResult.Result)
 		util.InfoLog.Printf("[acc]copy processed: %s", result)
 		if ioResult.Error != nil {
-			errs = append(errs, fmt.Errorf("chunk processing failed : %w", err))
+			errs = append(errs, fmt.Errorf("chunk processing failed : %w", ioResult.Error))
 		}
 	}
 
