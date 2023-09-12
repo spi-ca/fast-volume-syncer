@@ -15,7 +15,9 @@ RUN set -xe && \
     go mod download && \
     go mod verify && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o fast-volume-syncer . && \
-
+    mkdir -p v && \
+    curl -L "https://packages.timber.io/vector/0.32.1/vector-0.32.1-x86_64-unknown-linux-gnu.tar.gz"  | \
+    tar -C v --strip-components 3 -zxv ./vector-x86_64-unknown-linux-gnu/bin/vector
 
 ##
 ## Deploy
@@ -24,6 +26,7 @@ RUN set -xe && \
 FROM public.ecr.aws/docker/library/debian:sid-slim
 LABEL maintainer="Sangbum Kim <sangbumkim@amuz.es>"
 COPY --from=build /build/fast-volume-syncer /usr/local/bin/fast-volume-syncer
+COPY --from=build /build/v/vector /usr/local/bin/
 COPY contrib/bc-script/org_secure.sh /etc/profile.d/org_secure.sh
 COPY contrib/fsmon /usr/local/bin/fsmon
 
