@@ -63,7 +63,6 @@ func (i *Daemonizer) Execute() error {
 	if err != nil {
 		return err
 	}
-
 	defer logFile.Close()
 
 	var invoke *exec.Cmd

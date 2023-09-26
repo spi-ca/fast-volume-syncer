@@ -120,7 +120,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 				DestinationMountName:    viper.GetString("dst.storage.mount.name"),
 
 				Common: args.CopierCommonArguments{
-					LogPrefix: viper.GetString("log.file"),
+					LogPrefix: viper.GetString("log.prefix"),
 					FileMode:  sys.UnFilemodeStr(viper.GetString("file.mode")),
 					Args: args.RsyncArgs{
 						Verbose:            viper.GetBool("rsync.verbose"),

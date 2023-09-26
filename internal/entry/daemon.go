@@ -94,7 +94,7 @@ func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath strin
 			DestinationMountOptions: viper.GetString("dst.storage.mount.option"),
 			DestinationMountName:    viper.GetString("dst.storage.mount.name"),
 			Common: args.CopierCommonArguments{
-				LogPrefix: viper.GetString("log.file"),
+				LogPrefix: viper.GetString("log.prefix"),
 				FileMode:  sys.UnFilemodeStr(viper.GetString("file.mode")),
 				Args: args.RsyncArgs{
 					Verbose:            viper.GetBool("rsync.verbose"),
