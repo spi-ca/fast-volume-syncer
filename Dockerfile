@@ -4,7 +4,7 @@
 ## Build
 ##
 #FROM docker.io/library/golang:1.21.0-alpine AS build
-FROM public.ecr.aws/docker/library/golang:1.21.0 AS build
+FROM public.ecr.aws/docker/library/golang:1.21.1 AS build
 
 WORKDIR /build
 
