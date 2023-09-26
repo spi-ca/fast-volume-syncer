@@ -35,7 +35,7 @@ func DaemonStop() {
 }
 
 func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) {
-
+	util.CheckLogFile()
 	util.InfoLog.Print(
 		"args:",
 		"\n	pid.file=", viper.GetString("pid.file"),

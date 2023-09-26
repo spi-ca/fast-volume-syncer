@@ -46,6 +46,7 @@ func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) 
 	util.InfoLog.SetPrefix(fmt.Sprintf("%s&1>", viper.GetString("log.prefix")))
 	util.ErrLog.SetPrefix(fmt.Sprintf("%s&2>", viper.GetString("log.prefix")))
 
+	util.CheckLogFile()
 	util.InfoLog.Print(
 		"args:",
 		"\n	log.prefix=", viper.GetString("log.prefix"),

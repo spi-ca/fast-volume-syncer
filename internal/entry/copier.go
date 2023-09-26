@@ -43,8 +43,7 @@ func Copier(srcPath, dstPath string) {
 		util.InfoLog.SetPrefix(fmt.Sprintf("%s[%d]&1>", viper.GetString("log.prefix"), os.Getpid()))
 		util.ErrLog.SetPrefix(fmt.Sprintf("%s[%d]&2>", viper.GetString("log.prefix"), os.Getpid()))
 	}
-
-	// debug
+	util.CheckLogFile()
 	util.InfoLog.Print(
 		"args:",
 		"\n	log.prefix=", viper.GetString("log.prefix"),

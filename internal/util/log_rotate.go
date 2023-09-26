@@ -117,7 +117,7 @@ func rotateLogsInternal(at time.Time) {
 	}
 }
 
-func checkLogFile() {
+func CheckLogFile() {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -135,7 +135,7 @@ func checkLogFile() {
 		InfoLog.Printf("logging is stored in a file %s", stdoutFilePath)
 	} else {
 		InfoLog.Printf("stdout logging is stored in a file %s", stdoutFilePath)
-		InfoLog.Printf("stderr logging is stored in a file %s", stderrFilePath)
+		ErrLog.Printf("stderr logging is stored in a file %s", stderrFilePath)
 	}
 }
 
