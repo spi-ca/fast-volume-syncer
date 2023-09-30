@@ -1,7 +1,6 @@
-package internal
+package util
 
 import (
-	"log"
 	"os/exec"
 	"path/filepath"
 )
@@ -12,7 +11,7 @@ func LookupBinary(givenPath string) string {
 	}
 
 	if foundPath, err := exec.LookPath(givenPath); err != nil {
-		log.Printf("binary(%s) not found", givenPath)
+		ErrLog.Printf("binary(%s) not found", givenPath)
 		return ""
 	} else {
 		absPath, _ := filepath.Abs(foundPath)

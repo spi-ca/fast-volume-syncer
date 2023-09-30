@@ -1,0 +1,115 @@
+package args
+
+import (
+	"fmt"
+	"strconv"
+)
+
+type RsyncArgs struct {
+	Verbose            bool
+	Delete             bool
+	PreservePermission bool
+	PreserveOwnership  bool
+	CopySpecial        bool
+	Compress           bool
+	WholeFile          bool
+	Inplace            bool
+	Recursive          bool
+	Port               int
+	BandwidthLimit     string
+}
+
+func (a RsyncArgs) Assemble(src, dst string) []string {
+	args := []string{
+		//"--links",
+		//"--safe-links",
+		//"--omit-link-times",
+		"--no-links",
+		"--times",
+		"--one-file-system",
+		"--omit-dir-times",
+		"--human-readable",
+		"--protect-args",
+		"--timeout=0",
+		"--contimeout=0",
+	}
+
+	if a.Verbose {
+		args = append(args, "--stats")
+		args = append(args, "--verbose")
+		args = append(args, "--progress")
+
+	} else {
+		args = append(args, "--info=NAME2")
+
+	}
+
+	if a.Delete {
+		args = append(args, "--delete")
+		args = append(args, "--delete-during")
+	}
+
+	if a.PreservePermission {
+		args = append(args, "--perms")
+
+	} else {
+		args = append(args, "--no-perms")
+
+	}
+
+	if a.PreserveOwnership {
+		args = append(args, "--owner")
+		args = append(args, "--group")
+	} else {
+		args = append(args, "--no-owner")
+		args = append(args, "--no-group")
+	}
+
+	if a.CopySpecial {
+		args = append(args, "--devices")
+		args = append(args, "--specials")
+	} else {
+		args = append(args, "--no-devices")
+		args = append(args, "--no-specials")
+	}
+
+	if a.Compress {
+		args = append(args, "--compress")
+
+	} else {
+		args = append(args, "--no-compress")
+	}
+
+	if a.WholeFile {
+		args = append(args, "--whole-file")
+
+	} else {
+		args = append(args, "--no-whole-file")
+	}
+
+	if a.Inplace {
+		args = append(args, "--inplace")
+
+	} else {
+		args = append(args, "--no-inplace")
+	}
+
+	if a.Recursive {
+		args = append(args, "--recursive")
+	} else {
+		args = append(args, "--no-recursive")
+		args = append(args, "--files-from=-")
+	}
+
+	if a.Port > 0 {
+		args = append(args, "--port", strconv.Itoa(a.Port))
+	}
+
+	if len(a.BandwidthLimit) > 0 {
+		args = append(args, fmt.Sprint("--bwlimit=", a.BandwidthLimit))
+	}
+
+	args = append(args, src)
+	args = append(args, dst)
+	return args
+}

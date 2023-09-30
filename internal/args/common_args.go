@@ -1,97 +1,106 @@
 package args
 
 import (
-	"fmt"
-	"path/filepath"
+	"os"
 	"strconv"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/api/resource"
-
-	"github.com/google/uuid"
+	"time"
 )
 
-type NodeConfig struct {
-	Name       string            `json:"name"`
-	Cpus       int               `json:"cpus"`
-	Mem        resource.Quantity `json:"mem"`
-	Uuid       uuid.UUID         `json:"uuid"`
-	RootfsUuid uuid.UUID         `json:"rootfs_uuid"`
-	Image      string            `json:"image"`
-	NetMacAddr string            `json:"net_mac_addr"`
-	NetIfName  string            `json:"net_if_name"`
-	Cmdline    []string          `json:"cmdline"`
-	Disk       []string          `json:"disk"`
-	Directory  []string          `json:"directory"`
+type CopierCommonArguments struct {
+	FileMode  os.FileMode
+	LogPrefix string
+
+	Args RsyncArgs
+
+	UseRsync bool
+
+	ScanDuration     time.Duration
+	FinderBinaryPath string
+
+	TaskSize  int
+	ChunkSize int
+	Retry     RetryArgs
 }
 
-func (i *NodeConfig) MachineId() string { return strings.ReplaceAll(i.Uuid.String(), "-", "") }
-func (i *NodeConfig) ImageBasePath(imageRoot string, rest ...string) string {
-	args := []string{imageRoot, i.Image}
-	args = append(args, rest...)
-	return filepath.Join(args...)
-}
-func (i *NodeConfig) NodeBasePath(nodeRoot string, rest ...string) string {
-	args := []string{nodeRoot, i.Name}
-	args = append(args, rest...)
-	return filepath.Join(args...)
-}
-func (i *NodeConfig) KernelCommandline(partUuid string, machineId string) string {
-	args := append([]string(nil), i.Cmdline...)
-	args = append(args, fmt.Sprintf("base=UUID=%s", partUuid))
-	args = append(args, fmt.Sprintf("systemd.machine_id=%s", machineId))
-	return strings.Join(args, " ")
-}
-func (i *NodeConfig) PlatformArg(name string, machineId string, nodeUUID string) string {
-	args := append([]string(nil), i.Cmdline...)
-	args = append(args, fmt.Sprintf("oem_strings=amuzes-%s", name))
-	args = append(args, fmt.Sprintf("serial_number=%s", machineId))
-	args = append(args, fmt.Sprintf("uuid=%s", nodeUUID))
-	return strings.Join(args, ",")
-}
+func (i *CopierCommonArguments) AssembleEnvironment(inherited []string) []string {
+	envs := make([]string, 0, 20*2)
 
-func (i *NodeConfig) VirtiofsArgs(directory string, sockPath string) []string {
-	var args []string
-	args = append(args, "--allow-direct-io")
-	args = append(args, "--announce-submounts")
-	args = append(args, "--writeback")
-	args = append(args, "--xattr")
-	args = append(args, "--posix-acl")
-	args = append(args, "--thread-pool-size", strconv.Itoa(i.Cpus))
-	args = append(args, "--cache", "auto")
-	args = append(args, "--inode-file-handles=prefer")
-	args = append(args, "--shared-dir", directory)
-	args = append(args, "--socket-path", sockPath)
-	return args
-}
+	envs = append(envs, "FILE_MODE", i.FileMode.String())
+	envs = append(envs, "LOG_PREFIX", i.LogPrefix)
+	envs = append(envs, "RSYNC_ENABLED", strconv.FormatBool(i.UseRsync))
+	envs = append(envs, "RSYNC_VERBOSE", strconv.FormatBool(i.Args.Verbose))
+	envs = append(envs, "RSYNC_DELETE", strconv.FormatBool(i.Args.Delete))
+	envs = append(envs, "RSYNC_PERMS", strconv.FormatBool(i.Args.PreservePermission))
+	envs = append(envs, "RSYNC_OWNER", strconv.FormatBool(i.Args.PreserveOwnership))
+	envs = append(envs, "RSYNC_SPECIAL", strconv.FormatBool(i.Args.CopySpecial))
+	envs = append(envs, "RSYNC_COMPRESS", strconv.FormatBool(i.Args.Compress))
+	envs = append(envs, "RSYNC_WHOLE_FILE", strconv.FormatBool(i.Args.WholeFile))
+	envs = append(envs, "RSYNC_INPLACE", strconv.FormatBool(i.Args.Inplace))
+	envs = append(envs, "RSYNC_RECURSIVE", strconv.FormatBool(i.Args.Recursive))
+	envs = append(envs, "RSYNC_PORT", strconv.Itoa(i.Args.Port))
+	envs = append(envs, "RSYNC_BANDWIDTH_LIMIT", i.Args.BandwidthLimit)
 
-func (i *NodeConfig) CommandArgs(imageRoot string, nodeRoot string) []string {
-	machineId := i.MachineId()
-	nodeUUID := i.Uuid.String()
+	envs = append(envs, "SCAN_DEADLINE", i.ScanDuration.String())
+	envs = append(envs, "SCAN_FIND_PATH", i.FinderBinaryPath)
 
-	var args []string
-	args = append(args, "--platform", i.PlatformArg(i.Name, machineId, nodeUUID))
-	args = append(args, "--kernel", i.ImageBasePath(imageRoot, "vmlinuz"))
-	args = append(args, "--initramfs", i.ImageBasePath(imageRoot, "initramfs.img"))
-	args = append(args, "--cmdline", i.KernelCommandline(i.RootfsUuid.String(), machineId))
-	args = append(args, "--cpus", fmt.Sprintf("boot=%d", i.Cpus))
-	args = append(args, "--memory", fmt.Sprintf("size=%s,shared=on,mergeable=on,thp=on", strings.TrimSuffix(i.Mem.String(), "i")))
-	args = append(args, "--console", "pty")
-	args = append(args, "--serial", "off")
+	envs = append(envs, "TASK_SIZE", strconv.Itoa(i.TaskSize))
+	envs = append(envs, "CHUNK_SIZE", strconv.Itoa(i.ChunkSize))
 
-	args = append(args, "--serial", "off")
+	envs = append(envs, "RETRY_ATTEMPTS", strconv.Itoa(i.Retry.Attempts))
+	envs = append(envs, "RETRY_DELAY", i.Retry.Delay.String())
+	envs = append(envs, "RETRY_MAX_DELAY", i.Retry.MaxDelay.String())
+	envs = append(envs, "RETRY_MAX_JITTER", i.Retry.MaxJitter.String())
 
-	args = append(args, "--api-socket", fmt.Sprintf("path=%s", i.NodeBasePath(nodeRoot, "run", "monitor.sock")))
-	args = append(args, "--net", fmt.Sprintf("mac=%s,host_mac=,tap=%s,ip=,mask=,num_queues=2,queue_size=128", i.NetMacAddr, i.NetIfName))
-	for _, filename := range i.Directory {
-		args = append(args, "--fs", fmt.Sprintf("tag=%s,socket=%s,num_queues=1,queue_size=1024", filename, i.NodeBasePath(nodeRoot, "run", fmt.Sprintf("virtiofsd_%s.sock", filename))))
+	b := strings.Builder{}
+	for i := 0; i < len(envs)/2; i++ {
+		b.WriteString(envs[i*2])
+		b.WriteByte('=')
+		b.WriteString(envs[i*2+1])
+		inherited = append(inherited, b.String())
+		b.Reset()
 	}
-	args = append(args, "--disk", fmt.Sprintf("path=%s,direct=on,readonly=on,num_queues=2,queue_size=128", i.ImageBasePath(imageRoot, "root.img")))
-	for _, filename := range i.Disk {
-		args = append(args, "--disk", fmt.Sprintf("path=%s,direct=on,readonly=on,num_queues=2,queue_size=128", i.NodeBasePath(nodeRoot, filename)))
-	}
-	args = append(args, "--watchdog")
-	args = append(args, "--pvpanic")
+	return inherited
+}
 
-	return args
+type SyncerCommonArguments struct {
+	ReportEnabled      bool
+	SandboxMountOption string
+
+	SourceMountHost    string
+	SourceMountOptions string
+	SourceMountName    string
+
+	DestinationMountHost    string
+	DestinationMountOptions string
+	DestinationMountName    string
+
+	Common CopierCommonArguments
+}
+
+func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string {
+	inherited = i.Common.AssembleEnvironment(inherited)
+
+	envs := make([]string, 0, 8*2)
+
+	envs = append(envs, "REPORT_ENABLED", strconv.FormatBool(i.ReportEnabled))
+	envs = append(envs, "SANDBOX_MOUNT_OPTION", i.SandboxMountOption)
+
+	envs = append(envs, "SRC_STORAGE_MOUNT_HOST", i.SourceMountHost)
+	envs = append(envs, "SRC_STORAGE_MOUNT_OPTION", i.SourceMountOptions)
+	envs = append(envs, "SRC_STORAGE_MOUNT_NAME", i.SourceMountName)
+
+	envs = append(envs, "DST_STORAGE_MOUNT_HOST", i.DestinationMountHost)
+	envs = append(envs, "DST_STORAGE_MOUNT_OPTION", i.DestinationMountOptions)
+	envs = append(envs, "DST_STORAGE_MOUNT_NAME", i.DestinationMountName)
+
+	b := strings.Builder{}
+	for i := 0; i < len(envs)/2; i++ {
+		b.WriteString(envs[i*2])
+		b.WriteByte('=')
+		b.WriteString(envs[i*2+1])
+		inherited = append(inherited, b.String())
+		b.Reset()
+	}
+	return inherited
 }
