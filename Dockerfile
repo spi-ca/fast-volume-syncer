@@ -14,7 +14,8 @@ COPY main.go go.mod go.sum ./
 RUN set -xeu && \
     apk --no-cache add \
     git \
-    go
+    curl \
+    binutils
 
 RUN set -xe && \
     go mod download && \
@@ -50,22 +51,17 @@ FROM alpine:3.18
 LABEL maintainer="Sangbum Kim<sangbumkim@amuz.es>"
 COPY --from=build /build/fast-volume-syncer /usr/local/bin/fast-volume-syncer
 COPY --from=build /build/v/vector /usr/local/bin/
-COPY contrib/bc-script/org_secure.sh /etc/profile.d/org_secure.sh
-COPY contrib/fsmon /usr/local/bin/fsmon
 
 ARG UID=1000
 ARG GID=1000
 
 RUN set -xeu && \
     apk --no-cache add \
-    curl \
     strace \
     lsof \
     tini \
     htop \
     strace \
-    dstat \
-    git \
     sudo \
     && \
     apk --purge del \
@@ -80,14 +76,13 @@ RUN set -xeu && \
     /usr/share/apk
 
 RUN set -xeu && \
-    addgroup --gid $GID spi-ca && \
+    mkdir -p "/home/bc-user" && \
     adduser \
-    --disabled-login \
-    --home "/home/spi-ca" \
-    --gecos "" \
-    --shell /bin/bash \
-    --gid $GID \
-    --uid $UID \
+    -h "/home/spi-ca" \
+    -g "spi-ca" \
+    -s /bin/bash \
+    -D \
+    -u $UID \
     "spi-ca" && \
     echo 'spi-ca ALL=(root) NOPASSWD:ALL' > /etc/sudoers.d/spi-ca && \
     chmod 0440 "/etc/sudoers.d/spi-ca" && \
@@ -96,4 +91,4 @@ RUN set -xeu && \
 USER spi-ca:spi-ca
 WORKDIR /home/spi-ca
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ENTRYPOINT [ "/usr/bin/tini", "-s", "--", "fast-volume-syncer" ]
+ENTRYPOINT [ "/sbin/tini", "-s", "--", "fast-volume-syncer" ]
