@@ -62,6 +62,7 @@ RUN set -xeu && \
     tini \
     htop \
     strace \
+    gcompat \
     sudo \
     && \
     apk --purge del \
