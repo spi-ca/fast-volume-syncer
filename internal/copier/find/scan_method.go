@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
+	"github.com/charlievieth/fastwalk"
 )
 
 func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) error {
@@ -55,7 +56,9 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 			return filepath.SkipAll
 		}
 	}
-	err := filepath.WalkDir(root, iter)
+
+	conf := fastwalk.Config{}
+	err := fastwalk.Walk(&conf, root, iter)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("walkdir(%s) has returned err: %w", root, err))
 	}
