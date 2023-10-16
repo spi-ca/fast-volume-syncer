@@ -19,6 +19,8 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 			//do nothing
 		} else if errors.Is(err, filepath.SkipAll) { // for fastwalk
 			return filepath.SkipDir
+		} else if errors.Is(err, filepath.SkipDir) { // for fastwalk
+			return filepath.SkipDir
 		} else {
 			errs = append(errs, err)
 			return filepath.SkipDir
@@ -67,6 +69,8 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 	if err == nil {
 		// do nothing
 	} else if errors.Is(err, filepath.SkipAll) { // for fastwalk
+		// do nothing
+	} else if errors.Is(err, filepath.SkipDir) { // for fastwalk
 		// do nothing
 	} else {
 		errs = append(errs, fmt.Errorf("walkdir(%s) has returned err: %w", root, err))
