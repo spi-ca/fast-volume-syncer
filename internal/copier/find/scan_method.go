@@ -15,7 +15,11 @@ import (
 func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) error {
 	var errs []error
 	iter := func(path string, d os.DirEntry, err error) error {
-		if err != nil {
+		if err == nil {
+			//do nothing
+		} else if errors.Is(err, filepath.SkipAll) { // for fastwalk
+			return filepath.SkipDir
+		} else {
 			errs = append(errs, err)
 			return filepath.SkipDir
 		}
@@ -59,8 +63,14 @@ func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<-
 
 	conf := fastwalk.Config{}
 	err := fastwalk.Walk(&conf, root, iter)
-	if err != nil {
+
+	if err == nil {
+		// do nothing
+	} else if errors.Is(err, filepath.SkipAll) { // for fastwalk
+		// do nothing
+	} else {
 		errs = append(errs, fmt.Errorf("walkdir(%s) has returned err: %w", root, err))
 	}
+
 	return errors.Join(errs...)
 }

@@ -1,11 +1,10 @@
 package find
 
 import (
-	"context"
-	"fmt"
-
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
+	"context"
+	"fmt"
 )
 
 type Scanner struct {
