@@ -120,68 +120,16 @@ func main() {
 		}
 		entry.Syncer(sandboxSupported, srcStoragePath, srcStorageSubPath, dstStoragePath, dstStorageSubPath)
 	case "select":
-		var (
-			nodeSelector     = defaultNodeSelector
-			copyInfoFilePath = defaultCSVFilename
-		)
-		switch flags.NArg() {
-		case consumedArgs:
-			consumedArgs += 0
-		case consumedArgs + 1:
-			if rawNodeSelector, err := strconv.Atoi(flags.Arg(consumedArgs + 0)); err == nil {
-				nodeSelector = rawNodeSelector
-			} else {
-				fmt.Println("failed to parse nodeSelector:%w", err)
-				usage()
-			}
-			consumedArgs += 1
-		case consumedArgs + 2:
-			if flag := flags.Arg(consumedArgs + 0); flag == "_" {
-				// do nothing
-			} else if rawNodeSelector, err := strconv.Atoi(flag); err == nil {
-				nodeSelector = rawNodeSelector
-			} else {
-				fmt.Println("failed to parse nodeSelector:%w", err)
-				usage()
-			}
-			copyInfoFilePath = flags.Arg(consumedArgs + 1)
-			consumedArgs += 2
-		default:
-			fmt.Println("required arguments missing")
+		nodeSelector, copyInfoFilePath, err := parseSelectorArgs(flags.Args()[consumedArgs:], false)
+		if err != nil {
+			fmt.Println(err)
 			usage()
 		}
 		entry.Selector(sandboxSupported, nodeSelector, copyInfoFilePath)
 	case "start":
-		var (
-			nodeSelector     = defaultNodeSelector
-			copyInfoFilePath = defaultCSVFilename
-		)
-		switch flags.NArg() {
-		case consumedArgs:
-			consumedArgs += 0
-		case consumedArgs + 1:
-			if flag := flags.Arg(consumedArgs + 0); flag == "_" {
-				// do nothing
-			} else if rawNodeSelector, err := strconv.Atoi(flag); err == nil {
-				nodeSelector = rawNodeSelector
-			} else {
-				fmt.Println("failed to parse nodeSelector:%w", err)
-				usage()
-			}
-			consumedArgs += 1
-		case consumedArgs + 2:
-			if flag := flags.Arg(consumedArgs + 0); flag == "_" {
-				// do nothing
-			} else if rawNodeSelector, err := strconv.Atoi(flag); err == nil {
-				nodeSelector = rawNodeSelector
-			} else {
-				fmt.Println("failed to parse nodeSelector:%w", err)
-				usage()
-			}
-			copyInfoFilePath = flags.Arg(consumedArgs + 1)
-			consumedArgs += 2
-		default:
-			fmt.Println("required arguments missing")
+		nodeSelector, copyInfoFilePath, err := parseSelectorArgs(flags.Args()[consumedArgs:], true)
+		if err != nil {
+			fmt.Println(err)
 			usage()
 		}
 		entry.DaemonStart(sandboxSupported, nodeSelector, copyInfoFilePath)
@@ -193,17 +141,51 @@ func main() {
 	}
 }
 
+func parseSelectorArgs(args []string, allowBareUnderscore bool) (int, string, error) {
+	nodeSelector := defaultNodeSelector
+	copyInfoFilePath := defaultCSVFilename
+
+	switch len(args) {
+	case 0:
+		return nodeSelector, copyInfoFilePath, nil
+	case 1:
+		if args[0] == "_" && allowBareUnderscore {
+			return nodeSelector, copyInfoFilePath, nil
+		}
+		rawNodeSelector, err := strconv.Atoi(args[0])
+		if err != nil {
+			return 0, "", fmt.Errorf("failed to parse nodeSelector:%w", err)
+		}
+		return rawNodeSelector, copyInfoFilePath, nil
+	case 2:
+		if args[0] != "_" {
+			rawNodeSelector, err := strconv.Atoi(args[0])
+			if err != nil {
+				return 0, "", fmt.Errorf("failed to parse nodeSelector:%w", err)
+			}
+			nodeSelector = rawNodeSelector
+		}
+		return nodeSelector, args[1], nil
+	default:
+		return 0, "", fmt.Errorf("required arguments missing")
+	}
+}
+
 func usage() {
 	fmt.Printf("usage: \n"+
 		"\t%s copy SRC_PATH DST_PATH\n"+
 		"\t%s sync SRC_PATH [SRC_SUBPATH] DST_PATH [DST_SUBPATH]\n"+
-		"\t%s select [NODE_SELECTOR:%d] [COPY_INFO_CSV_PATH:%s]\n"+
-		"\t%s start [NODE_SELECTOR:%d] [COPY_INFO_CSV_PATH:%s]\n"+
+		"\t%s select [NODE_SELECTOR:%d]\n"+
+		"\t%s select _|NODE_SELECTOR COPY_INFO_CSV_PATH:%s\n"+
+		"\t%s start [NODE_SELECTOR:%d|_]\n"+
+		"\t%s start _|NODE_SELECTOR COPY_INFO_CSV_PATH:%s\n"+
 		"\t%s stop \nargs:\n",
 		name,
 		name,
-		name, defaultNodeSelector, defaultCSVFilename,
-		name, defaultNodeSelector, defaultCSVFilename,
+		name, defaultNodeSelector,
+		name, defaultCSVFilename,
+		name, defaultNodeSelector,
+		name, defaultCSVFilename,
 		name,
 	)
 	flags.PrintDefaults()
