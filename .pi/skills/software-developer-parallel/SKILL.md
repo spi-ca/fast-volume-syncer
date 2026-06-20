@@ -80,10 +80,10 @@ Examples that are usually not safe to split without a merge step:
 
 Match validation to the touched files:
 
-- Go code: `go test ./...`
+- Go code: `gofmt -w .`, `scripts/check-go-comments.py`, `go test ./...`, tagged integration/NFS compile-only checks, and `go vet ./...`
 - CSV/JSON: parse the touched CSV or JSON files with a local parser
 - daemon pid/log handling: focused start/stop or pid/log-file smoke checks when safe
-- `.pi`/docs-only work: `go test ./...`, JSON parse, frontmatter spot check, inventory listings, `git diff --check`
+- `.pi`/docs-only work: `go test ./...` (including guardrails), parse `.pi/settings.json`, validate frontmatter for every `.pi/agents/*.md`, `.pi/skills/*/SKILL.md`, and `.pi/prompts/*.md`, run `{ printf '%s\n' README.md AGENTS.md CLAUDE.md; find docs -maxdepth 2 -type f; } | sort`, and run `git diff --check`; regenerate Mermaid SVG/2x PNG when diagrams change
 
 ## Quality Gates
 

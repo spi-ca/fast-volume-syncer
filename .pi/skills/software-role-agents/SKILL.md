@@ -142,10 +142,10 @@ Use this chain for sufficiently large tasks. Run `parallel-development` only whe
 
 Pick only the checks that match the changed files:
 
-- Go source, CLI flags, config builders, or internal packages: keep changed Go files formatted and run `go test ./...`.
+- Go source, CLI flags, config builders, or internal packages: run `gofmt -w .`, `scripts/check-go-comments.py`, `go test ./...`, tagged integration/NFS compile-only checks, and `go vet ./...`.
 - CSV files: parse with Go tests, a small Python `csv` check, or another repo-approved CSV parser; JSON files: parse with `python3 -m json.tool` or `json.load`.
 - daemon pid/log handling changes: run focused start/stop or pid/log-file smoke checks when safe; otherwise report the skipped runtime prerequisite clearly.
-- `.pi` or docs-only changes: run `go test ./...`, parse JSON files, spot-check frontmatter, run inventory listings, and run `git diff --check`.
+- `.pi` or docs-only changes: run `go test ./...`, parse `.pi/settings.json`, validate frontmatter for every `.pi/agents/*.md`, `.pi/skills/*/SKILL.md`, and `.pi/prompts/*.md`, run `{ printf '%s\n' README.md AGENTS.md CLAUDE.md; find docs -maxdepth 2 -type f; } | sort`, and run `git diff --check`; diagram changes also require Mermaid SVG and 2x PNG regeneration.
 - Changes to copy, sync, or rsync command construction, storage paths, CSV selector inputs, or copy/sync/select/start/stop flows should include focused evidence from tests or inspected command/config outputs.
 
 ## Single-Agent Fallback

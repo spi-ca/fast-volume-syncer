@@ -18,9 +18,10 @@ Do not use this skill for evidence from unrelated projects or for validation sur
 ## Procedure
 
 1. Pick validation surfaces that match changed files.
-   - Go code, CLI flags, copier/syncer/selector logic, or args structs: run `go test ./...`.
-   - Code changes: run `gofmt -w .` before tests and `go vet ./...` after formatting.
-   - Docs or `.pi` changes: run `go test ./...`, parse JSON files, spot-check frontmatter, run the docs inventory command, and run `git diff --check`.
+   - Go code, CLI flags, copier/syncer/selector logic, or args structs: run `gofmt -w .`, `scripts/check-go-comments.py`, `go test ./...`, `go test -tags=integration -run '^$' .`, `go test -tags='integration,nfs' -run '^$' .`, and `go vet ./...`.
+   - Integration-test skeletons: run the same code-change checks, including the compile-only tagged checks and `go vet ./...`.
+   - Docs or `.pi` changes: run `go test ./...`, parse `.pi/settings.json`, validate frontmatter for every `.pi/agents/*.md`, `.pi/skills/*/SKILL.md`, and `.pi/prompts/*.md`, run the docs inventory command, and run `git diff --check`.
+   - Diagram changes: regenerate matching Mermaid SVG and 2x PNG artifacts.
 2. If timing evidence is requested, wrap the exact repo-native command with a non-root timing tool such as `/usr/bin/time` and record the full command line.
 3. Prefer focused measurements around file scanning, native copy, rsync task execution, selector fan-out, or daemon pid/log behavior.
 4. Keep raw command output as the source of truth and write summaries separately.
@@ -36,6 +37,6 @@ Do not use this skill for evidence from unrelated projects or for validation sur
 
 ## Verification
 
-- Touched Go code passes `go test ./...` and, when code changed, `go vet ./...` after `gofmt -w .`.
-- Docs/`.pi` changes pass `go test ./...`, JSON/frontmatter spot checks, the docs inventory command, and `git diff --check`.
+- Touched Go code passes `gofmt -w .`, `scripts/check-go-comments.py`, `go test ./...`, tagged integration/NFS compile-only checks, and `go vet ./...`.
+- Docs/`.pi` changes pass `go test ./...`, `.pi/settings.json` parsing, full `.pi/agents`/`.pi/skills`/`.pi/prompts` frontmatter validation, the docs inventory command, and `git diff --check`; diagram changes also refresh Mermaid SVG and 2x PNG artifacts.
 - Any recorded measurement includes command lines, environment notes, and corresponding correctness checks.

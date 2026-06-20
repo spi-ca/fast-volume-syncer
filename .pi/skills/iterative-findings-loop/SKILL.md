@@ -31,10 +31,10 @@ Use this skill when QA or review findings require one or more fix-and-revalidate
 
 Choose the checks that match the touched files:
 
-- Go code: `go test ./...`
+- Go code: `gofmt -w .`, `scripts/check-go-comments.py`, `go test ./...`, tagged integration/NFS compile-only checks, and `go vet ./...`
 - CSV files: parse with Go tests, Python `csv`, or another repo-approved CSV parser; JSON files: parse with `python3 -m json.tool` or `json.load`
 - daemon pid/log handling changes: run focused start/stop or pid/log-file smoke checks when safe
-- `.pi`/docs-only changes: `go test ./...`, JSON parse, frontmatter spot check, inventory listings, `git diff --check`
+- `.pi`/docs-only changes: `go test ./...`, parse `.pi/settings.json`, validate frontmatter for every `.pi/agents/*.md`, `.pi/skills/*/SKILL.md`, and `.pi/prompts/*.md`, run `{ printf '%s\n' README.md AGENTS.md CLAUDE.md; find docs -maxdepth 2 -type f; } | sort`, and run `git diff --check`; regenerate Mermaid SVG and 2x PNG when diagrams change
 
 If a required local tool is unavailable, report that limitation explicitly instead of marking the check as passed.
 

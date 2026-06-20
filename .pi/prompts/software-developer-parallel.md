@@ -21,7 +21,7 @@ Required behavior:
 7. Run QA and review, preferably with `software-qa` and `software-reviewer` in a parallel verification stage.
 8. Repeat fixes until findings and blockers are cleared.
 
-When composing validation commands for this repo, use `go test ./...` as the baseline check. Add touched-surface checks such as CSV fixture inspection for selector changes, JSON/frontmatter/inventory checks and `git diff --check` for `.pi` or docs resources, and daemon pid/log smoke checks when start/stop behavior changes.
+When composing validation commands for this repo, follow `docs/operations.md`: use `go test ./...` as the baseline (it transitively runs comment and tagged compile guardrails), run `gofmt -w .`, `scripts/check-go-comments.py`, tagged integration/NFS compile-only checks, and `go vet ./...` for code changes, regenerate Mermaid SVG/2x PNG for diagram changes, and add JSON/frontmatter/inventory checks plus `git diff --check` for `.pi` or docs resources.
 
 Recommended parallel implementation shape:
 

@@ -22,7 +22,7 @@ Role set:
 
 Required for every task: user representative, systems engineer when system constraints matter, designer, implementer, QA, and reviewer. Use `software-developer` only when the design identifies at least one independent work package; otherwise document why it was skipped and implement sequentially.
 
-When defining validation commands for this repo, use `go test ./...` as the baseline check. Add touched-surface checks that apply: CSV fixture inspection for selector changes, JSON/frontmatter/inventory checks and `git diff --check` for `.pi` or docs resources, and daemon pid/log smoke checks when start/stop behavior changes.
+When defining validation commands for this repo, follow `docs/operations.md`: use `go test ./...` as the baseline (it transitively runs comment and tagged compile guardrails), run `gofmt -w .`, `scripts/check-go-comments.py`, tagged integration/NFS compile-only checks, and `go vet ./...` for code changes, regenerate Mermaid SVG/2x PNG for diagram changes, and add JSON/frontmatter/inventory checks plus `git diff --check` for `.pi` or docs resources.
 
 Recommended chain shape:
 
