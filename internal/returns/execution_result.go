@@ -1,3 +1,4 @@
+// Package returns defines result objects shared by worker, sync, and mount flows.
 package returns
 
 import (
@@ -9,19 +10,26 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
+// ExecutionResult tracks process completion data and the last ten stderr log lines.
 type ExecutionResult struct {
+	// PID identifies the child process that produced this result.
 	PID int
+	// Err stores the process error returned by exec or wait handling.
 	Err error
 
+	// stderrLastLogLineStartIdx points at the oldest slot in the circular log buffer.
 	stderrLastLogLineStartIdx int
-	stderrLastLogLines        [10]string
+	// stderrLastLogLines stores a ring buffer of the most recent stderr lines.
+	stderrLastLogLines [10]string
 }
 
+// AppendLogLine records one stderr line into the fixed-size circular buffer.
 func (r *ExecutionResult) AppendLogLine(line string) {
 	r.stderrLastLogLines[r.stderrLastLogLineStartIdx] = line
 	r.stderrLastLogLineStartIdx = (r.stderrLastLogLineStartIdx + 1) % len(r.stderrLastLogLines)
 }
 
+// LastLogLine returns the buffered stderr lines in oldest-to-newest order.
 func (r *ExecutionResult) LastLogLine() []string {
 	loglines := make([]string, 0, len(r.stderrLastLogLines))
 	for i := 0; i < len(r.stderrLastLogLines); i++ {
@@ -33,6 +41,7 @@ func (r *ExecutionResult) LastLogLine() []string {
 	return loglines
 }
 
+// HandleError converts Err and buffered stderr lines into the final reported error.
 func (r *ExecutionResult) HandleError() error {
 	exitcode := 0
 	if err := r.Err; err != nil {

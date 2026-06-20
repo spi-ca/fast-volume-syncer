@@ -1,3 +1,4 @@
+// Package selector parses copy-entry CSV rows and fans them out to sync workers.
 package selector
 
 import (
@@ -10,17 +11,22 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
+// workerJoiner bounds concurrent sync children and waits for all submitted work to finish.
 type workerJoiner struct {
+	// workerSize is the maximum number of sync children allowed to run concurrently.
 	workerSize int
-	invoker    *Invoker
+	// invoker starts the sync child process for each accepted CSV entry.
+	invoker *Invoker
 }
 
+// Execute starts the fan-out loop and returns a stream of worker errors.
 func (c *workerJoiner) Execute(ctx context.Context, entryRecvChan <-chan copyEntry) <-chan error {
 	errorChan := make(chan error, c.workerSize)
 	go c.dispatch(ctx, entryRecvChan, errorChan)
 	return errorChan
 }
 
+// dispatch reads parsed CSV entries, acquires worker slots, and submits each sync child.
 func (c *workerJoiner) dispatch(ctx context.Context, entryRecvChan <-chan copyEntry, errorChan chan<- error) {
 	sem := semaphore.NewWeighted(int64(c.workerSize))
 	defer func() {
@@ -47,6 +53,7 @@ func (c *workerJoiner) dispatch(ctx context.Context, entryRecvChan <-chan copyEn
 	}
 }
 
+// submit runs one entry through the invoker and reports its duration or failure.
 func (c *workerJoiner) submit(ctx context.Context, closer func(), entry copyEntry, errorChan chan<- error) {
 	defer closer()
 

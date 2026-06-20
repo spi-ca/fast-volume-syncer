@@ -1,3 +1,4 @@
+// Package find scans source trees with either `find -ls` or an in-process walker.
 package find
 
 import (
@@ -6,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -27,6 +27,7 @@ var (
 	symlinkFormat = regexp.MustCompile(`^(.*) -> (.*)$`)
 )
 
+// parseFindEntry converts one `find -ls` output line into Fileinfo data.
 func (s *Scanner) parseFindEntry(line []byte) (*returns.Fileinfo, error) {
 
 	matched := findFormat.FindSubmatchIndex(line)
@@ -45,12 +46,12 @@ func (s *Scanner) parseFindEntry(line []byte) (*returns.Fileinfo, error) {
 	}
 
 	//inode, _ := strconv.Atoi(match(1))
-	size := util.SimpleStrconv(match(2))
+	//blocks, _ := strconv.Atoi(match(2))
 	mode := sys.UnFilemode(match(3))
 	//num_of_hardlink, _ := strconv.Atoi(match(4))
 	//owner := match(5)
 	//group := match(6)
-	//store_size, _ := strconv.Atoi(match(7))
+	size := util.SimpleStrconv(match(7))
 	//date := match(8)
 	path := match(9)
 
@@ -86,6 +87,7 @@ func (s *Scanner) parseFindEntry(line []byte) (*returns.Fileinfo, error) {
 	}
 }
 
+// handleFindStderr logs stderr lines so scanner failures keep their original context.
 func (s *Scanner) handleFindStderr(res *returns.ExecutionResult, reader io.Reader, closer func()) {
 	defer closer()
 	prefix := fmt.Sprintf("[%d]&2> ", res.PID)
@@ -97,6 +99,7 @@ func (s *Scanner) handleFindStderr(res *returns.ExecutionResult, reader io.Reade
 	}
 }
 
+// handleFindStdout parses `find -ls` rows, filters ignored paths, and emits relative entries.
 func (s *Scanner) handleFindStdout(ctx context.Context, res *returns.ExecutionResult, reader io.Reader, closer func(), rowChan chan<- returns.Fileinfo, root string) {
 	defer closer()
 	scanner := bufio.NewScanner(reader)
@@ -131,6 +134,7 @@ func (s *Scanner) handleFindStdout(ctx context.Context, res *returns.ExecutionRe
 	}
 }
 
+// executeFind runs the external find command and streams parsed results back to Scan.
 func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) error {
 	invoke := exec.CommandContext(
 		ctx,
@@ -139,7 +143,7 @@ func (s *Scanner) executeFind(ctx context.Context, root string, rowChan chan<- r
 		"-ls",
 	)
 
-	invoke.Env = os.Environ()
+	invoke.Env = util.TrustedChildEnvironment()
 	invoke.Stdin = nil
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 

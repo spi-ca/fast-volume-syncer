@@ -1,3 +1,4 @@
+// Package selector parses copy-entry CSV rows and fans them out to sync workers.
 package selector
 
 import (
@@ -5,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -20,22 +20,26 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
+// Invoker launches one sync child process for a selected copy entry.
 type Invoker struct {
+	// SandboxDisabled decides whether the sync child should skip namespace isolation.
 	SandboxDisabled bool
-	Common          args.SyncerCommonArguments
+	// Common carries the shared syncer/copier environment for every child process.
+	Common args.SyncerCommonArguments
 }
 
+// Run starts the sync child, forwards its logs, and ties its lifetime to the selector context.
 func (i *Invoker) Run(parentContext context.Context, entry copyEntry) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	invoke := exec.CommandContext(ctx, sys.Executable(), "sync", entry.SourceVolume, entry.SourcePath, entry.DestinationVolume, entry.DestinationPath)
-	invoke.Env = i.assembleEnvironment(os.Environ())
+	invoke.Env = i.assembleEnvironment(util.TrustedChildEnvironment())
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
 	if i.SandboxDisabled {
-		//do nothing
+		// The sync child will mount directly in the current namespace.
 	} else if err := sys.ApplySysProAttrIsolation(invoke.SysProcAttr); err != nil {
 		return fmt.Errorf("failed to set unshare flags id: %w", err)
 	}
@@ -51,9 +55,7 @@ func (i *Invoker) Run(parentContext context.Context, entry copyEntry) error {
 	stdout, _ := invoke.StdoutPipe()
 	stderr, _ := invoke.StderrPipe()
 
-	// On Linux, pdeathsig will kill the child process when the thread dies,
-	// not when the process dies. runtime.LockOSThread ensures that as long
-	// as this function is executing that OS thread will still be around
+	// pdeathsig is tied to the calling OS thread, so keep this goroutine pinned until Start returns.
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -81,6 +83,7 @@ func (i *Invoker) Run(parentContext context.Context, entry copyEntry) error {
 	return res.HandleError()
 }
 
+// assembleEnvironment marks the child as selector-invoked and records whether it should sandbox itself.
 func (i *Invoker) assembleEnvironment(inherited []string) []string {
 	inherited = i.Common.AssembleEnvironment(inherited)
 	envs := make([]string, 0, 2*2)
@@ -98,6 +101,7 @@ func (i *Invoker) assembleEnvironment(inherited []string) []string {
 	return inherited
 }
 
+// handleStdout prefixes child stdout lines with the child pid and writes them to the info log.
 func (i *Invoker) handleStdout(res *returns.ExecutionResult, reader io.Reader, closer func()) {
 	defer closer()
 	prefix := fmt.Sprintf("[%d] ", res.PID)
@@ -108,6 +112,7 @@ func (i *Invoker) handleStdout(res *returns.ExecutionResult, reader io.Reader, c
 	}
 }
 
+// handleStderr prefixes child stderr lines, records them on the result, and writes them to the error log.
 func (i *Invoker) handleStderr(res *returns.ExecutionResult, reader io.Reader, closer func()) {
 	defer closer()
 	prefix := fmt.Sprintf("[%d] ", res.PID)

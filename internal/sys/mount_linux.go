@@ -1,6 +1,7 @@
 //go:build linux
 // +build linux
 
+// Package sys wraps platform-specific process, mount, descriptor, and mode helpers.
 package sys
 
 import (
@@ -11,14 +12,14 @@ import (
 	"github.com/moby/sys/mount"
 )
 
+// Sandbox makes the mount tree private, remounts /proc, and replaces the temp dir with tmpfs for sandboxed work.
 func Sandbox(sandboxMountOption string) error {
 	err := mount.MakeRPrivate("/")
 	if err != nil {
 		return fmt.Errorf("failed to make private mount point / : %w", err)
 	}
 
-	// 여기서부터 filesystem 격리.
-
+	// Filesystem isolation starts after the root mount is made private.
 	err = mount.Unmount("/proc")
 	if err != nil {
 		return fmt.Errorf("failed to umount /proc : %w", err)
@@ -48,6 +49,7 @@ func Sandbox(sandboxMountOption string) error {
 	return nil
 }
 
+// Mount creates destinationPath and mounts source there with the requested filesystem type and options.
 func Mount(source string, destinationPath string, mountType string, mountOptions string) (err error) {
 	err = os.Mkdir(destinationPath, 0o755)
 	if err != nil {
@@ -61,10 +63,28 @@ func Mount(source string, destinationPath string, mountType string, mountOptions
 	return nil
 }
 
+// BindMountFD bind-mounts an already opened directory fd onto a private workspace mount point.
+func BindMountFD(fd uintptr, destinationPath string) error {
+	if err := os.Mkdir(destinationPath, 0o755); err != nil {
+		return fmt.Errorf("failed to make a directory(%s): %w", destinationPath, err)
+	}
+	source := fmt.Sprintf("/proc/self/fd/%d", fd)
+	if err := mount.Mount(source, destinationPath, "", "bind"); err != nil {
+		return fmt.Errorf("failed to bind mount %s to %s: %w", source, destinationPath, err)
+	}
+	if err := mount.Mount("", destinationPath, "", "remount,bind,nosymfollow"); err != nil {
+		_ = mount.Unmount(destinationPath)
+		return fmt.Errorf("failed to enforce nosymfollow on bind mount %s: %w", destinationPath, err)
+	}
+	return nil
+}
+
+// Umount unmounts a single mount point created for sync work.
 func Umount(destinationPath string) error {
 	return mount.Unmount(destinationPath)
 }
 
+// RecursiveUmounts recursively tears down a mount point and any nested mounts below it.
 func RecursiveUmounts(destinationPath string) error {
 	return mount.RecursiveUnmount(destinationPath)
 }

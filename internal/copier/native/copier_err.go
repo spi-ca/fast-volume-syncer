@@ -1,3 +1,4 @@
+// Package native copies scanned entries with direct filesystem operations.
 package native
 
 import (
@@ -16,16 +17,22 @@ var (
 	ErrCopierDstNoSpace                = errors.New("destination is full")
 )
 
+// copierError adds source and destination paths to a backend copy failure.
 type copierError struct {
+	// srcPath is the fully qualified source path for the failed entry.
 	srcPath string
+	// dstPath is the fully qualified destination path for the failed entry.
 	dstPath string
-	cause   error
+	// cause is the wrapped filesystem or classification error.
+	cause error
 }
 
+// Error formats the failed copy pair together with the wrapped cause.
 func (e copierError) Error() string {
 	return fmt.Sprintf("failed to Copy(%s -> %s): %v", e.srcPath, e.dstPath, e.cause)
 }
 
+// Unwrap returns the underlying copy failure.
 func (e copierError) Unwrap() error {
 	return e.cause
 }

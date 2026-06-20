@@ -1,3 +1,4 @@
+// Package copier batches scanned entries and sends them to the selected copy backend.
 package copier
 
 import (
@@ -12,27 +13,43 @@ import (
 )
 
 type (
-	copyMethod  func(context.Context, []returns.Fileinfo) (returns.IOResult, error)
+	// copyMethod copies one chunk of scanned entries.
+	//
+	// Implementations must treat the provided slice as read-only because the
+	// chunk joiner may recycle the backing array after the call returns, and they
+	// must tolerate concurrent calls from multiple chunk workers.
+	copyMethod func(context.Context, []returns.Fileinfo) (returns.IOResult, error)
+
+	// chunkJoiner groups scan results into bounded concurrent copy jobs.
 	chunkJoiner struct {
-		taskSize  int
+		// taskSize limits how many chunk workers may run at once.
+		taskSize int
+		// chunkSize is the target number of entries per submitted chunk.
 		chunkSize int
 
-		copier       copyMethod
+		// copier handles each submitted chunk.
+		copier copyMethod
+		// scanDuration flushes a partial chunk when scanning pauses.
 		scanDuration time.Duration
 	}
 
+	// chunkResult carries one chunk worker result back to the runner.
 	chunkResult struct {
+		// Result holds per-chunk copy accounting.
 		Result returns.IOResult
-		Error  error
+		// Error reports the chunk-level failure, if any.
+		Error error
 	}
 )
 
+// Execute starts the chunk dispatcher and returns a stream of chunk results.
 func (c *chunkJoiner) Execute(ctx context.Context, entryRecvChan <-chan returns.Fileinfo) <-chan chunkResult {
 	resultChan := make(chan chunkResult, c.taskSize)
 	go c.dispatch(ctx, entryRecvChan, resultChan)
 	return resultChan
 }
 
+// dispatch fills chunks from the scanner stream and submits them with bounded concurrency.
 func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns.Fileinfo, resultChan chan<- chunkResult) {
 	sem := semaphore.NewWeighted(int64(c.taskSize))
 	deadline := time.NewTicker(c.scanDuration)
@@ -103,6 +120,7 @@ func (c *chunkJoiner) dispatch(ctx context.Context, entryRecvChan <-chan returns
 	}
 }
 
+// submit runs one copy job and forwards its result.
 func (c *chunkJoiner) submit(ctx context.Context, closer func([]returns.Fileinfo), chunk []returns.Fileinfo, resultChan chan<- chunkResult) {
 	defer closer(chunk)
 	res := chunkResult{}

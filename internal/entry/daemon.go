@@ -1,7 +1,12 @@
+// Package entry adapts CLI commands to signal-aware internal runners.
 package entry
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/viper"
@@ -12,6 +17,7 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
+// DaemonStop reads the selector pid file and asks the running daemonized selector to exit.
 func DaemonStop() {
 	pidFilePath := viper.GetString("pid.file")
 	pid, err := selector.ReadPidFile(pidFilePath)
@@ -27,6 +33,10 @@ func DaemonStop() {
 	}
 	defer proc.Release()
 
+	if err := verifyDaemonProcess(pid); err != nil {
+		util.ErrLog.Fatalf("refusing to stop pid(%d): %v", pid, err)
+	}
+
 	err = proc.Signal(syscall.SIGTERM)
 	if err != nil {
 		util.ErrLog.Fatalf("failed to SIGTERM(%d) :%v", pid, err)
@@ -34,7 +44,48 @@ func DaemonStop() {
 	util.InfoLog.Printf("sending SIGTERM(%d)", pid)
 }
 
+// verifyDaemonProcess confirms that a pid file still points to a fast-volume-syncer executable on Linux.
+func verifyDaemonProcess(pid int) error {
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+	procExe, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
+	if err != nil {
+		return fmt.Errorf("read process executable: %w", err)
+	}
+	currentExe := sys.Executable()
+	if resolved, err := filepath.EvalSymlinks(currentExe); err == nil {
+		currentExe = resolved
+	}
+	if resolved, err := filepath.EvalSymlinks(procExe); err == nil {
+		procExe = resolved
+	}
+	procExe = strings.TrimSuffix(procExe, " (deleted)")
+	if procExe != currentExe && filepath.Base(procExe) != filepath.Base(currentExe) {
+		return fmt.Errorf("process executable %q does not match %q", procExe, currentExe)
+	}
+	environ, err := os.ReadFile(fmt.Sprintf("/proc/%d/environ", pid))
+	if err != nil {
+		return fmt.Errorf("read process environment: %w", err)
+	}
+	if !strings.Contains(string(environ), "_FVS_DAEMONEZED=true") {
+		return fmt.Errorf("process is not a daemonized selector")
+	}
+	cmdline, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
+	if err != nil {
+		return fmt.Errorf("read process command line: %w", err)
+	}
+	if !strings.Contains(string(cmdline), "\x00select\x00") {
+		return fmt.Errorf("process command line is not selector mode")
+	}
+	return nil
+}
+
+// DaemonStart builds a detached selector launcher from CLI configuration and starts it.
 func DaemonStart(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) {
+	if copyInfoFilePath == "-" {
+		util.ErrLog.Fatal("daemon start does not support stdin CSV path '-' ; use select _ - in the foreground or pass a file path")
+	}
 	util.CheckLogFile()
 	util.InfoLog.Print(
 		"args:",

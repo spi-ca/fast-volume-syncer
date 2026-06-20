@@ -1,3 +1,4 @@
+// Package rsync copies file chunks by driving the rsync CLI.
 package rsync
 
 import (
@@ -32,15 +33,23 @@ var (
 	rsyncUptodateFormat = regexp.MustCompile(`^(.+?)( is uptodate)?$`)
 )
 
+// Task drives one rsync process for a chunk of scanned entries.
 type Task struct {
-	Arguments       args.RsyncArgs
-	FileMode        os.FileMode
-	SourcePath      string
+	// Arguments holds the rsync CLI flags assembled for Execute.
+	Arguments args.RsyncArgs
+	// FileMode is applied when directories or symlinks are materialized locally.
+	FileMode os.FileMode
+	// SourcePath is the rsync source root passed to the process.
+	SourcePath string
+	// DestinationPath is the rsync destination root passed to the process.
 	DestinationPath string
-	Retry           args.RetryArgs
-	chunkIdx        uint64
+	// Retry configures chunk-level retries around execute.
+	Retry args.RetryArgs
+	// chunkIdx numbers chunks for logs and result messages.
+	chunkIdx uint64
 }
 
+// Execute runs rsync for one chunk and optionally retries the whole chunk.
 func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) (result returns.IOResult, err error) {
 
 	chunkIdx := atomic.AddUint64(&t.chunkIdx, 1)
@@ -55,20 +64,28 @@ func (t *Task) Execute(ctx context.Context, fileList []returns.Fileinfo) (result
 	}, retryOptionArgs...)
 }
 
+// execute starts rsync, streams chunk paths through stdin, and collects stdout/stderr accounting.
 func (t *Task) execute(parentContext context.Context, chunkIdx uint64, fileList []returns.Fileinfo) (returns.IOResult, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	res := &result{chunkIdx: chunkIdx, total: len(fileList), started: time.Now()}
 	defer res.markEnd()
+	if err := t.ensureDestinationPaths(fileList); err != nil {
+		return res, err
+	}
 
+	rsyncPath := util.LookupBinary("rsync")
+	if rsyncPath == "" {
+		return res, fmt.Errorf("rsync binary not found in trusted PATH")
+	}
 	invoke := exec.CommandContext(
 		ctx,
-		"rsync",
+		rsyncPath,
 		t.Arguments.Assemble(t.SourcePath, t.DestinationPath)...,
 	)
 
-	invoke.Env = os.Environ()
+	invoke.Env = util.TrustedChildEnvironment()
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
 	if err := sys.ApplySysProAttrPdeathsig(invoke.SysProcAttr, syscall.SIGTERM); err != nil {
@@ -110,6 +127,22 @@ func (t *Task) execute(parentContext context.Context, chunkIdx uint64, fileList 
 	return res, res.HandleError()
 }
 
+// ensureDestinationPaths rejects destination symlink ancestors before rsync receives the file list.
+func (t *Task) ensureDestinationPaths(fileList []returns.Fileinfo) error {
+	for _, entry := range fileList {
+		dstPath := filepath.Join(t.DestinationPath, entry.Path)
+		if entry.Mode.IsDir() {
+			if err := util.EnsureNoSymlinkPath(dstPath); err != nil {
+				return err
+			}
+		} else if err := util.EnsureNoSymlinkAncestors(dstPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// handleRsyncStdin writes the chunk file list to rsync and materializes local dirs/symlinks.
 func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList []returns.Fileinfo) {
 	defer closer()
 	if writer == nil {
@@ -134,8 +167,8 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList [
 		} else {
 			mode := entry.Mode
 			if mode.IsDir() {
-				// ensure mode
-				dirMode := mode.Perm() | t.FileMode.Perm()
+				// ensure private destination directory mode
+				dirMode := t.FileMode.Perm() | 0o700
 				dirPath := filepath.Join(t.DestinationPath, entry.Path)
 				err := t.processDirectory(dirPath, dirMode)
 				if err != nil {
@@ -150,6 +183,10 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList [
 					continue
 				}
 			} else if mode.IsRegular() {
+				if err := util.EnsurePrivatePath(filepath.Dir(filepath.Join(t.DestinationPath, entry.Path))); err != nil {
+					util.ErrLog.Print(err)
+					continue
+				}
 				if addSep {
 					_ = w.WriteByte('\n')
 				} else {
@@ -165,6 +202,7 @@ func (t *Task) handleRsyncStdin(writer io.WriteCloser, closer func(), fileList [
 
 }
 
+// handleRsyncStdout parses rsync output lines into per-entry progress counters.
 func (t *Task) handleRsyncStdout(res *result, reader io.Reader, closer func(), fileList []returns.Fileinfo) {
 	defer closer()
 
@@ -245,6 +283,7 @@ func (t *Task) handleRsyncStdout(res *result, reader io.Reader, closer func(), f
 	}
 }
 
+// handleRsyncStderr keeps the last stderr lines for exit-code based error reporting.
 func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closer func()) {
 	defer closer()
 	prefix := fmt.Sprintf("[%d] ", res.pid)
@@ -256,6 +295,7 @@ func (t *Task) handleRsyncStderr(res *result, reader io.Reader, closer func()) {
 	}
 }
 
+// processDirectory ensures a destination directory exists before rsync writes files into it.
 func (t *Task) processDirectory(dstPath string, dstMode os.FileMode) error {
 	destExists := false
 	if dstPath == t.DestinationPath {
@@ -299,6 +339,7 @@ func (t *Task) processDirectory(dstPath string, dstMode os.FileMode) error {
 	return nil
 }
 
+// processSymbolicLink recreates the destination symlink so rsync can skip link management.
 func (t *Task) processSymbolicLink(linkPath, dstPath string) error {
 
 	if dstMode, err := os.Lstat(dstPath); err == nil {
@@ -333,12 +374,15 @@ func (t *Task) processSymbolicLink(linkPath, dstPath string) error {
 		} else if !os.IsNotExist(err) {
 			return fmt.Errorf("failed to make a symbolic link(%s -> %s), failed to get fileinfo %s :%w",
 				dstPath, linkPath, dirPath, err)
-		} else if err = os.MkdirAll(dirPath, 0o755); err != nil {
+		} else if err = os.MkdirAll(dirPath, t.FileMode.Perm()|0o700); err != nil {
 			return fmt.Errorf("failed to make a symbolic link(%s -> %s), failed to create directory %s :%w",
 				dstPath, linkPath,
 				dirPath, err,
 			)
 		}
+	}
+	if err := util.EnsurePrivatePath(filepath.Dir(dstPath)); err != nil {
+		return err
 	}
 
 	err := os.Symlink(linkPath, dstPath)

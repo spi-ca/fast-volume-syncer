@@ -1,3 +1,7 @@
+//go:build !windows
+// +build !windows
+
+// Package util provides logging, formatting, flag-binding, and binary lookup helpers.
 package util
 
 import (
@@ -16,20 +20,23 @@ import (
 )
 
 var (
+	// logRotateLock prevents concurrent descriptor rotation.
 	logRotateLock sync.Mutex
 )
 
+// RotateLogs forces an immediate log-rotation pass using the current wall clock.
 func RotateLogs() {
 	rotateLogsInternal(time.Now())
 }
 
+// StartRotateLogMidnight waits for the next local midnight, then rotates once per day until ctx is canceled.
 func StartRotateLogMidnight(ctx context.Context) {
-	// Position the first execution
+	// Position the first execution.
 	first, duration := getNextMidnight()
 	offset := first.Sub(time.Now())
 	firstC := time.After(offset)
 
-	// Receiving from a nil channel blocks forever
+	// Receiving from a nil channel blocks forever.
 	t := &time.Ticker{C: nil}
 	for {
 		select {
@@ -45,6 +52,7 @@ func StartRotateLogMidnight(ctx context.Context) {
 	}
 }
 
+// getNextMidnight returns the next local midnight and the fixed 24-hour interval used after the first rotation.
 func getNextMidnight() (time.Time, time.Duration) {
 	const Day = 24 * time.Hour
 	now := time.Now()
@@ -52,11 +60,12 @@ func getNextMidnight() (time.Time, time.Duration) {
 	return now.Truncate(Day).Add(-time.Duration(dif) * time.Second).Add(Day), Day
 }
 
+// rotateLogsInternal serializes rotation, swaps live stdio file descriptors, and handles shared stdout/stderr logs.
 func rotateLogsInternal(at time.Time) {
 	logRotateLock.Lock()
 	defer logRotateLock.Unlock()
 
-	// 로그파일명 충돌을 막기 위하여 1초를 기다린다.
+	// Wait one second before returning so the next rotated filename cannot collide on the same timestamp.
 	delay := time.After(time.Second)
 	defer func() { <-delay }()
 
@@ -95,7 +104,12 @@ func rotateLogsInternal(at time.Time) {
 		}
 
 		_ = os.Stderr.Sync()
-		_ = sys.ReplaceFD(newStdErrFd, stderrFd)
+		if err := sys.ReplaceFD(newStdErrFd, stderrFd); err != nil {
+			_ = syscall.Close(newStdErrFd)
+			ErrLog.Printf("failed to replace stderr fd: %v", err)
+			return
+		}
+		_ = syscall.Close(newStdErrFd)
 
 		InfoLog.Printf("log file rotated! previous log saved to %s", savedFilename)
 	} else {
@@ -117,12 +131,13 @@ func rotateLogsInternal(at time.Time) {
 	}
 }
 
+// CheckLogFile reports the regular-file destinations currently backing log output, if any.
 func CheckLogFile() {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
 	stdoutFilePath, stdoutInfo, stdoutErr := sys.PathFromFd(os.Stdout.Fd())
-	stderrFilePath, stderrInfo, stderrErr := sys.PathFromFd(os.Stdout.Fd())
+	stderrFilePath, stderrInfo, stderrErr := sys.PathFromFd(os.Stderr.Fd())
 	if stdoutErr != nil ||
 		stderrErr != nil {
 		return
@@ -139,6 +154,7 @@ func CheckLogFile() {
 	}
 }
 
+// rotateFile renames the active log, opens a replacement, fsyncs the old fd, and dup-replaces it in place.
 func rotateFile(filename string, at time.Time, fd int) (string, error) {
 	ext := filepath.Ext(filename)
 	rotateFilename := fmt.Sprintf("%s_%s%s", filename[:len(filename)-len(ext)], at.Format("2006-01-02-15:04:05"), ext)
@@ -147,10 +163,16 @@ func rotateFile(filename string, at time.Time, fd int) (string, error) {
 		return "", fmt.Errorf("failed to rename a file(%s) :%w", filename, err)
 	}
 
-	newFd, err := syscall.Open(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND|syscall.O_CLOEXEC, 0o644)
+	newFd, err := syscall.Open(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0o600)
 	if err != nil {
 		_ = os.Rename(rotateFilename, filename)
-		return "", fmt.Errorf("failed to rename a file(%s): %w", filename, err)
+		return "", fmt.Errorf("failed to reopen log file(%s): %w", filename, err)
+	}
+	var stat syscall.Stat_t
+	if err := syscall.Fstat(newFd, &stat); err != nil || stat.Mode&syscall.S_IFMT != syscall.S_IFREG {
+		_ = os.Rename(rotateFilename, filename)
+		_ = syscall.Close(newFd)
+		return "", fmt.Errorf("replacement log file must be regular(%s): %w", filename, err)
 	}
 
 	err = syscall.Fsync(fd)
@@ -166,6 +188,7 @@ func rotateFile(filename string, at time.Time, fd int) (string, error) {
 		_ = syscall.Close(newFd)
 		return "", fmt.Errorf("failed to dup(2)(%d,%d): %w", newFd, fd, err)
 	}
+	_ = syscall.Close(newFd)
 
 	return rotateFilename, nil
 }

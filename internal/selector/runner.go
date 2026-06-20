@@ -1,3 +1,4 @@
+// Package selector parses copy-entry CSV rows and fans them out to sync workers.
 package selector
 
 import (
@@ -12,19 +13,25 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
+// Runner reads selector CSV input, filters rows by node, and fans accepted entries out to workers.
 type Runner struct {
-	NodeSelector    int
+	// NodeSelector keeps only rows for one node when set to a non-negative value.
+	NodeSelector int
+	// CopyInfoCSVPath names the CSV file that defines the copy work to schedule.
 	CopyInfoCSVPath string
 
+	// WorkerSize sizes the worker pool and the handoff buffer to sync children.
 	WorkerSize int
 
+	// Template provides the child-process configuration copied into each worker invocation.
 	Template Invoker
 }
 
+// Execute opens the CSV source, streams parsed entries to workers, and joins their errors.
 func (r *Runner) Execute(ctx context.Context) error {
 	var f io.Reader
 	if r.CopyInfoCSVPath == "-" {
-		f = io.NopCloser(os.Stdout)
+		f = os.Stdin
 	} else if rawFile, err := os.OpenFile(r.CopyInfoCSVPath, os.O_RDONLY, 0o666); err != nil {
 		return err
 	} else {
@@ -51,6 +58,7 @@ func (r *Runner) Execute(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
+// loadCopyEntryCSV parses selector rows, trims fields, applies the node filter, and emits runnable entries.
 func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryChan chan<- copyEntry) {
 	defer close(entryChan)
 
@@ -63,9 +71,8 @@ func (r *Runner) loadCopyEntryCSV(ctx context.Context, reader io.Reader, entryCh
 		}
 	}()
 
-	// csv reader 생성
+	// Stream rows from the selector CSV instead of loading the full file into memory.
 	rdr := csv.NewReader(reader)
-	// csv 내용 모두 읽기
 	for {
 		row, err := rdr.Read()
 		if err == io.EOF {

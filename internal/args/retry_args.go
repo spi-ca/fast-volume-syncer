@@ -1,3 +1,4 @@
+// Package args assembles environment and command arguments for sync and copy workers.
 package args
 
 import (
@@ -7,13 +8,19 @@ import (
 	"github.com/avast/retry-go"
 )
 
+// RetryArgs describes retry-go options derived from CLI or environment configuration.
 type RetryArgs struct {
-	Attempts  int
-	Delay     time.Duration
-	MaxDelay  time.Duration
+	// Attempts limits how many times an operation is retried.
+	Attempts int
+	// Delay sets the base delay between attempts.
+	Delay time.Duration
+	// MaxDelay switches delay handling to backoff when it exceeds Delay.
+	MaxDelay time.Duration
+	// MaxJitter caps random jitter added to delayed retries.
 	MaxJitter time.Duration
 }
 
+// Assemble converts RetryArgs into retry-go options, including optional context cancellation.
 func (a *RetryArgs) Assemble(ctx context.Context) []retry.Option {
 
 	optionArgs := []retry.Option{

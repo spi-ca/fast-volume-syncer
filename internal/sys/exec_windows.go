@@ -1,5 +1,5 @@
-//go:build !linux && !darwin && !windows
-// +build !linux,!darwin,!windows
+//go:build windows
+// +build windows
 
 // Package sys wraps platform-specific process, mount, descriptor, and mode helpers.
 package sys
@@ -15,16 +15,14 @@ func ApplySysProAttrIsolation(attr *syscall.SysProcAttr) error {
 	return fmt.Errorf("this os(%s) not supported", runtime.GOOS)
 }
 
-// ApplySysProAttrPGid places the child in a separate process group.
+// ApplySysProAttrPGid reports that process groups are unsupported by this target shim.
 func ApplySysProAttrPGid(attr *syscall.SysProcAttr) error {
-	attr.Setpgid = true
-	return nil
+	return fmt.Errorf("this os(%s) not supported", runtime.GOOS)
 }
 
-// ApplySysProAttrSid starts the child in a new session.
+// ApplySysProAttrSid reports that sessions are unsupported by this target shim.
 func ApplySysProAttrSid(attr *syscall.SysProcAttr) error {
-	attr.Setsid = true
-	return nil
+	return fmt.Errorf("this os(%s) not supported", runtime.GOOS)
 }
 
 // ApplySysProAttrPdeathsig reports that parent-death signals are unsupported on this target.

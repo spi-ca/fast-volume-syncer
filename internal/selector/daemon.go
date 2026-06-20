@@ -1,3 +1,4 @@
+// Package selector parses copy-entry CSV rows and fans them out to sync workers.
 package selector
 
 import (
@@ -14,17 +15,26 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
+// Daemonizer launches a detached select process with inherited sync configuration.
 type Daemonizer struct {
-	NodeSelector    int
+	// NodeSelector limits the detached selector to one node when non-negative.
+	NodeSelector int
+	// CopyInfoCSVPath names the CSV file the detached selector should read.
 	CopyInfoCSVPath string
-	LogFilePath     string
-	PidFilePath     string
-	WorkerSize      int
+	// LogFilePath is the append-only log sink for the detached selector process.
+	LogFilePath string
+	// PidFilePath is exported so the detached selector can lock and publish its pid.
+	PidFilePath string
+	// WorkerSize caps how many sync children the detached selector may run at once.
+	WorkerSize int
+	// SandboxDisabled tells the detached selector to skip process isolation.
 	SandboxDisabled bool
 
+	// Common carries the syncer/copier environment shared with the detached selector.
 	Common args.SyncerCommonArguments
 }
 
+// assembleEnvironment appends daemon-specific environment variables to the inherited syncer environment.
 func (i *Daemonizer) assembleEnvironment(inherited []string) []string {
 	inherited = i.Common.AssembleEnvironment(inherited)
 	envs := make([]string, 0, 1)
@@ -43,20 +53,34 @@ func (i *Daemonizer) assembleEnvironment(inherited []string) []string {
 	return inherited
 }
 
+// openLogFile creates the daemon log directory and opens the append-only log file.
 func (i *Daemonizer) openLogFile() (*os.File, error) {
 	logFileDir := filepath.Dir(i.LogFilePath)
-	err := os.MkdirAll(logFileDir, 0o755)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make logdir(%s): %w", logFileDir, err)
+	if err := ensureDaemonDirectory(logFileDir); err != nil {
+		return nil, fmt.Errorf("unsafe log directory: %w", err)
+	}
+	if err := validatePidDirectory(logFileDir); err != nil {
+		return nil, fmt.Errorf("unsafe log directory: %w", err)
 	}
 
-	logFile, err := os.OpenFile(i.LogFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+	logFile, err := os.OpenFile(i.LogFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND|syscall.O_NOFOLLOW, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+	if info, err := logFile.Stat(); err != nil {
+		_ = logFile.Close()
+		return nil, fmt.Errorf("failed to stat log file: %w", err)
+	} else if !info.Mode().IsRegular() {
+		_ = logFile.Close()
+		return nil, fmt.Errorf("log file must be a regular file: %s", i.LogFilePath)
+	} else if err := validateOwnedPrivatePath(i.LogFilePath, info); err != nil {
+		_ = logFile.Close()
+		return nil, err
 	}
 	return logFile, nil
 }
 
+// Execute starts a detached select child, redirects logs, and releases the parent handle.
 func (i *Daemonizer) Execute() error {
 
 	logFile, err := i.openLogFile()
@@ -76,7 +100,7 @@ func (i *Daemonizer) Execute() error {
 	invoke.Stdin = nil
 	invoke.Stdout = logFile
 	invoke.Stderr = logFile
-	invoke.Env = i.assembleEnvironment(os.Environ())
+	invoke.Env = i.assembleEnvironment(util.TrustedChildEnvironment())
 	invoke.SysProcAttr = &syscall.SysProcAttr{}
 
 	err = sys.ApplySysProAttrSid(invoke.SysProcAttr)

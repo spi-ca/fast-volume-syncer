@@ -1,3 +1,4 @@
+// Package copier batches scanned entries and sends them to the selected copy backend.
 package copier
 
 import (
@@ -21,21 +22,31 @@ var (
 	pathSeperatorStr = string(filepath.Separator)
 )
 
+// Runner wires scanning, chunking, and the selected copy implementation together.
 type Runner struct {
+	// FileMode is OR-ed into destination permissions for created files and directories.
 	FileMode os.FileMode
 
+	// Args holds rsync CLI options when UseRsync is enabled.
 	Args args.RsyncArgs
 
+	// UseRsync selects the rsync backend instead of the native copier.
 	UseRsync bool
 
-	ScanDuration     time.Duration
+	// ScanDuration flushes a partial chunk when scanning pauses.
+	ScanDuration time.Duration
+	// FinderBinaryPath enables external `find -ls` scanning when set.
 	FinderBinaryPath string
 
-	TaskSize  int
+	// TaskSize limits concurrent chunk copy jobs.
+	TaskSize int
+	// ChunkSize is the target number of scanned entries per copy job.
 	ChunkSize int
-	Retry     args.RetryArgs
+	// Retry configures chunk-level retry behavior for the selected backend.
+	Retry args.RetryArgs
 }
 
+// Execute scans the source tree, runs chunk copies, and reports aggregate progress.
 func (r *Runner) Execute(ctx context.Context, sourcePath string, destinationPath string) error {
 	sourcePath, destinationPath, err := r.prepareDirectory(sourcePath, destinationPath)
 	if err != nil {
@@ -105,8 +116,12 @@ func (r *Runner) Execute(ctx context.Context, sourcePath string, destinationPath
 	return err
 }
 
+// prepareDirectory normalizes the source path and ensures the destination root exists.
 func (r *Runner) prepareDirectory(sourcePath string, destinationPath string) (string, string, error) {
 	// 아래 영역은 이제 host os 와 격리되었다.
+	if err := util.EnsureNoSymlinkPath(sourcePath); err != nil {
+		return "", "", fmt.Errorf("unsafe source path(%s): %w", sourcePath, err)
+	}
 	sourceStat, err := os.Stat(sourcePath)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get source file info(%s): %w", sourcePath, err)
@@ -115,11 +130,22 @@ func (r *Runner) prepareDirectory(sourcePath string, destinationPath string) (st
 		sourcePath += pathSeperatorStr
 	}
 
-	// destination 확인
-	destinationFilemode := sourceStat.Mode() | 0o700
+	// Destination roots are created with the configured private directory mode rather than inheriting broad source permissions.
+	destinationFilemode := r.FileMode.Perm() | 0o700
 
-	if err := os.MkdirAll(destinationPath, destinationFilemode.Perm()); err == nil {
+	if err := util.EnsurePrivatePathPrefix(destinationPath); err != nil {
+		return "", "", fmt.Errorf("unsafe destination directory(%s): %w", destinationPath, err)
+	}
+	if err := os.MkdirAll(destinationPath, destinationFilemode.Perm()); err != nil {
+		return "", "", fmt.Errorf("failed to prepare destination directory(%s): %w", destinationPath, err)
+	} else {
 		util.InfoLog.Printf("directory %s created", destinationPath)
+	}
+	if err := os.Chmod(destinationPath, destinationFilemode.Perm()); err != nil {
+		return "", "", fmt.Errorf("failed to apply destination directory mode(%s): %w", destinationPath, err)
+	}
+	if err := util.EnsurePrivatePath(destinationPath); err != nil {
+		return "", "", fmt.Errorf("unsafe destination directory(%s): %w", destinationPath, err)
 	}
 
 	return sourcePath, destinationPath, nil

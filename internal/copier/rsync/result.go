@@ -1,3 +1,4 @@
+// Package rsync copies file chunks by driving the rsync CLI.
 package rsync
 
 import (
@@ -14,10 +15,14 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
+// exitCodeResult describes how a specific rsync exit code should be treated.
 type exitCodeResult struct {
-	Success   bool
+	// Success reports whether the exit code should be treated as success.
+	Success bool
+	// Retryable reports whether chunk-level retry should be allowed.
 	Retryable bool
-	Message   string
+	// Message is the human-readable rsync exit-code explanation.
+	Message string
 }
 
 var (
@@ -48,30 +53,48 @@ var (
 	}
 )
 
+// result records rsync chunk progress, exit-code context, and recent activity.
 type result struct {
-	chunkIdx      uint64
-	startIdx      int
+	// chunkIdx identifies the chunk in logs and error messages.
+	chunkIdx uint64
+	// startIdx is the ring-buffer cursor for lastFilenames.
+	startIdx int
+	// lastFilenames keeps the most recent paths reported by rsync.
 	lastFilenames [10]string
-	total         int
+	// total is the number of scheduled entries in the chunk.
+	total int
 
-	files       int
-	links       int
+	// files counts regular-file entries confirmed by stdout parsing.
+	files int
+	// links counts symbolic-link entries confirmed by stdout parsing.
+	links int
+	// directories counts directory entries confirmed by stdout parsing.
 	directories int
 
-	sent      int
+	// sent counts entries rsync reported as transferred.
+	sent int
+	// processed counts stdout lines that did not map back to the input set.
 	processed int
-	uptodate  int
+	// uptodate counts entries rsync reported as already current.
+	uptodate int
+	// sentBytes accumulates transferred bytes using source metadata.
 	sentBytes int64
-	pid       int
+	// pid is the running rsync process ID for logging.
+	pid int
 
+	// started and ended bound the rsync process lifetime for the chunk.
 	started, ended time.Time
 
+	// err stores the raw process wait error for exit-code interpretation.
 	err error
 
+	// stderrLastLogLineStartIdx is the ring-buffer cursor for stderrLastLogLines.
 	stderrLastLogLineStartIdx int
-	stderrLastLogLines        [10]string
+	// stderrLastLogLines keeps the most recent rsync stderr lines.
+	stderrLastLogLines [10]string
 }
 
+// Duration reports how long the rsync process ran.
 func (r result) Duration() time.Duration {
 	if r.ended.After(r.started) {
 		return r.ended.Sub(r.started)
@@ -79,17 +102,29 @@ func (r result) Duration() time.Duration {
 		return 0
 	}
 }
-func (r result) Total() int64       { return int64(r.total) }
-func (r result) Files() int64       { return int64(r.files) }
-func (r result) Links() int64       { return int64(r.links) }
-func (r result) Directories() int64 { return int64(r.directories) }
-func (r result) SentBytes() int64   { return r.sentBytes }
 
+// Total returns the number of scheduled entries.
+func (r result) Total() int64 { return int64(r.total) }
+
+// Files returns the number of regular-file entries counted in stdout parsing.
+func (r result) Files() int64 { return int64(r.files) }
+
+// Links returns the number of symbolic-link entries counted in stdout parsing.
+func (r result) Links() int64 { return int64(r.links) }
+
+// Directories returns the number of directory entries counted in stdout parsing.
+func (r result) Directories() int64 { return int64(r.directories) }
+
+// SentBytes returns the byte total inferred from transferred file metadata.
+func (r result) SentBytes() int64 { return r.sentBytes }
+
+// appendLogLine stores a stderr line in the fixed-size recent-log ring buffer.
 func (r *result) appendLogLine(line string) {
 	r.stderrLastLogLines[r.stderrLastLogLineStartIdx] = line
 	r.stderrLastLogLineStartIdx = (r.stderrLastLogLineStartIdx + 1) % len(r.stderrLastLogLines)
 }
 
+// lastLogLine returns the recent stderr ring buffer in chronological order.
 func (r *result) lastLogLine() []string {
 	loglines := make([]string, 0, len(r.stderrLastLogLines))
 	for i := 0; i < len(r.stderrLastLogLines); i++ {
@@ -101,11 +136,13 @@ func (r *result) lastLogLine() []string {
 	return loglines
 }
 
+// appendFilename stores filename in the fixed-size recent-file ring buffer.
 func (r *result) appendFilename(filename string) {
 	r.lastFilenames[r.startIdx] = filename
 	r.startIdx = (r.startIdx + 1) % len(r.lastFilenames)
 }
 
+// listFilename returns the recent-file ring buffer in chronological order.
 func (r *result) listFilename() []string {
 	filenames := make([]string, 0, len(r.lastFilenames))
 	for i := 0; i < len(r.lastFilenames); i++ {
@@ -117,6 +154,7 @@ func (r *result) listFilename() []string {
 	return filenames
 }
 
+// addTypeCount increments the file-type counters for one parsed entry.
 func (r *result) addTypeCount(mode fs.FileMode) {
 	if mode.IsDir() {
 		r.directories++
@@ -126,8 +164,11 @@ func (r *result) addTypeCount(mode fs.FileMode) {
 		r.files++
 	}
 }
+
+// markEnd stamps the end time once rsync finishes.
 func (r *result) markEnd() { r.ended = time.Now() }
 
+// String formats chunk progress, exit-code context, and recent filenames for logs.
 func (r result) String() string {
 	buf := &strings.Builder{}
 
@@ -184,6 +225,7 @@ func (r result) String() string {
 	return buf.String()
 }
 
+// HandleError converts rsync exit semantics into retryable or unrecoverable Go errors.
 func (r *result) HandleError() error {
 	err, retryable := r.rsyncExitResult()
 	if err != nil && !retryable {
@@ -192,6 +234,7 @@ func (r *result) HandleError() error {
 	return err
 }
 
+// rsyncExitResult maps the process exit code to retryability and attaches recent logs/files.
 func (r *result) rsyncExitResult() (error, bool) {
 
 	exitcode := 0

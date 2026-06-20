@@ -1,3 +1,4 @@
+// Package args assembles environment and command arguments for sync and copy workers.
 package args
 
 import (
@@ -5,20 +6,33 @@ import (
 	"strconv"
 )
 
+// RsyncArgs describes the optional flags appended to each rsync invocation.
 type RsyncArgs struct {
-	Verbose            bool
-	Delete             bool
+	// Verbose enables rsync progress and transfer statistics.
+	Verbose bool
+	// Delete removes destination entries that no longer exist in the source.
+	Delete bool
+	// PreservePermission keeps source permission bits on copied entries.
 	PreservePermission bool
-	PreserveOwnership  bool
-	CopySpecial        bool
-	Compress           bool
-	WholeFile          bool
-	Inplace            bool
-	Recursive          bool
-	Port               int
-	BandwidthLimit     string
+	// PreserveOwnership keeps source owner and group metadata when possible.
+	PreserveOwnership bool
+	// CopySpecial allows device files and other special files to be copied.
+	CopySpecial bool
+	// Compress enables rsync stream compression.
+	Compress bool
+	// WholeFile disables delta transfer optimization.
+	WholeFile bool
+	// Inplace writes updates directly into the destination file.
+	Inplace bool
+	// Recursive traverses directory trees instead of reading file lists from stdin.
+	Recursive bool
+	// Port selects a non-default rsync daemon or remote-shell port.
+	Port int
+	// BandwidthLimit passes rsync's --bwlimit value through unchanged.
+	BandwidthLimit string
 }
 
+// Assemble returns the full rsync argument vector, including src and dst as the final arguments.
 func (a RsyncArgs) Assemble(src, dst string) []string {
 	args := []string{
 		//"--links",

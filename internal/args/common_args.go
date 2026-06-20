@@ -1,3 +1,4 @@
+// Package args assembles environment and command arguments for sync and copy workers.
 package args
 
 import (
@@ -7,22 +8,33 @@ import (
 	"time"
 )
 
+// CopierCommonArguments holds copier settings that are exported as worker environment variables.
 type CopierCommonArguments struct {
-	FileMode  os.FileMode
+	// FileMode is serialized into FILE_MODE for created destination entries.
+	FileMode os.FileMode
+	// LogPrefix is serialized into LOG_PREFIX for child-process logging.
 	LogPrefix string
 
+	// Args provides the rsync-specific settings exported as RSYNC_* variables.
 	Args RsyncArgs
 
+	// UseRsync controls whether the child process enables rsync mode.
 	UseRsync bool
 
-	ScanDuration     time.Duration
+	// ScanDuration is serialized into SCAN_DEADLINE for directory scans.
+	ScanDuration time.Duration
+	// FinderBinaryPath is serialized into SCAN_FIND_PATH for external find execution.
 	FinderBinaryPath string
 
-	TaskSize  int
+	// TaskSize is serialized into TASK_SIZE for worker fan-out.
+	TaskSize int
+	// ChunkSize is serialized into CHUNK_SIZE for per-batch file counts.
 	ChunkSize int
-	Retry     RetryArgs
+	// Retry provides RETRY_* values for child retry behavior.
+	Retry RetryArgs
 }
 
+// AssembleEnvironment appends KEY=VALUE pairs for copier settings onto inherited.
 func (i *CopierCommonArguments) AssembleEnvironment(inherited []string) []string {
 	envs := make([]string, 0, 20*2)
 
@@ -63,21 +75,32 @@ func (i *CopierCommonArguments) AssembleEnvironment(inherited []string) []string
 	return inherited
 }
 
+// SyncerCommonArguments holds sync-only environment variables on top of copier settings.
 type SyncerCommonArguments struct {
-	ReportEnabled      bool
+	// ReportEnabled is serialized into REPORT_ENABLED for reporting hooks.
+	ReportEnabled bool
+	// SandboxMountOption is serialized into SANDBOX_MOUNT_OPTION for sandbox mounts.
 	SandboxMountOption string
 
-	SourceMountHost    string
+	// SourceMountHost is serialized into SRC_STORAGE_MOUNT_HOST.
+	SourceMountHost string
+	// SourceMountOptions is serialized into SRC_STORAGE_MOUNT_OPTION.
 	SourceMountOptions string
-	SourceMountName    string
+	// SourceMountName is serialized into SRC_STORAGE_MOUNT_NAME.
+	SourceMountName string
 
-	DestinationMountHost    string
+	// DestinationMountHost is serialized into DST_STORAGE_MOUNT_HOST.
+	DestinationMountHost string
+	// DestinationMountOptions is serialized into DST_STORAGE_MOUNT_OPTION.
 	DestinationMountOptions string
-	DestinationMountName    string
+	// DestinationMountName is serialized into DST_STORAGE_MOUNT_NAME.
+	DestinationMountName string
 
+	// Common contributes the shared copier environment variables first.
 	Common CopierCommonArguments
 }
 
+// AssembleEnvironment appends sync-specific KEY=VALUE pairs after the shared copier environment.
 func (i *SyncerCommonArguments) AssembleEnvironment(inherited []string) []string {
 	inherited = i.Common.AssembleEnvironment(inherited)
 

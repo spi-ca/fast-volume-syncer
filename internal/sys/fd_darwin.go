@@ -1,6 +1,7 @@
-//go:build darwin
-// +build darwin
+//go:build darwin && cgo
+// +build darwin,cgo
 
+// Package sys wraps platform-specific process, mount, descriptor, and mode helpers.
 package sys
 
 /*
@@ -19,6 +20,7 @@ import (
 	"unsafe"
 )
 
+// PathFromFd resolves an open descriptor to its current path with F_GETPATH and returns fresh file info.
 func PathFromFd(fd uintptr) (string, os.FileInfo, error) {
 
 	var (
