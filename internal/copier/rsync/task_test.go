@@ -135,7 +135,7 @@ func TestRsyncTask_Execute_find_method(t1 *testing.T) {
 			panic(err)
 		}
 
-		_, err = io.Copy(f, &io.LimitedReader{rand.Reader, 4 * 1024})
+		_, err = io.Copy(f, &io.LimitedReader{R: rand.Reader, N: 4 * 1024})
 		if err != nil {
 			panic(err)
 		}
@@ -145,7 +145,7 @@ func TestRsyncTask_Execute_find_method(t1 *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		_, err = io.Copy(f, &io.LimitedReader{rand.Reader, 4 * 1024})
+		_, err = io.Copy(f, &io.LimitedReader{R: rand.Reader, N: 4 * 1024})
 		if err != nil {
 			panic(err)
 		}
@@ -219,7 +219,7 @@ func TestRsyncTask_Execute_scan_method(t1 *testing.T) {
 			panic(err)
 		}
 
-		_, err = io.Copy(f, &io.LimitedReader{rand.Reader, 4 * 1024})
+		_, err = io.Copy(f, &io.LimitedReader{R: rand.Reader, N: 4 * 1024})
 		if err != nil {
 			panic(err)
 		}
@@ -229,7 +229,7 @@ func TestRsyncTask_Execute_scan_method(t1 *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		_, err = io.Copy(f, &io.LimitedReader{rand.Reader, 4 * 1024})
+		_, err = io.Copy(f, &io.LimitedReader{R: rand.Reader, N: 4 * 1024})
 		if err != nil {
 			panic(err)
 		}

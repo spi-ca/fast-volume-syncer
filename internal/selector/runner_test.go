@@ -3,30 +3,74 @@ package selector
 import (
 	"bytes"
 	"context"
-	"log"
 	"testing"
 )
 
-func TestRunner_loadCopyEntryCSV(t *testing.T) {
+const copyEntryCSVFixture = `node,src_vol,dst_vol,src_path,dst_path,project_id,project_name,used_size,used_size_human,volume_type,volume_size,volume_size_human,destination_project_name,volume_name,source_volume_key
+7, storage-a , vol-a , /src/a , /dst/a ,1, project-a ,1024,1Ki,project,2048,2Ki, dest-a , volume-a , key-a
+5,storage-b,vol-b,/src/b,/dst/b,2,project-b,4096,4Ki,sandbox,8192,8Ki,dest-b,volume-b,key-b
+bad,storage-c,vol-c,/src/c,/dst/c,3,project-c,1,1B,project,2,2B,dest-c,volume-c,key-c
+3,too,few,columns
+8,storage-d,vol-d,/src/d,/dst/d,not-int,project-d,1,1B,project,2,2B,dest-d,volume-d,key-d
+9,storage-e,vol-e,/src/e,/dst/e,4,project-e,not-int,1B,project,2,2B,dest-e,volume-e,key-e
+10,storage-f,vol-f,/src/f,/dst/f,5,project-f,1,1B,project,not-int,2B,dest-f,volume-f,key-f
+`
+
+func collectCopyEntries(t *testing.T, r Runner, data string) []copyEntry {
+	t.Helper()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testData := []byte(
-		`node,src_vol,dst_vol,src_path,dst_path,project_id,project_name,used_size,used_size_human,volume_type,volume_size,volume_size_human,destination_project_name,volume_name,source_volume_key
-7,storage-a,vol_fixture-00000000-0000-4000-8000-000000000000,/fixture/ro/fixture-data/units/1/project/project-a,/,1,exampleorg,7060507722752,6.422Ti,project,10000000000000,10Ti,exampleorg/Project-Alpha,worker-60,exampleorg/project/project-a
-0,storage-a,vol_fixture-00000000-0000-4000-8000-000000000000,/fixture/ro/fixture-data/units/1/project/project-a,/,1,exampleorg,4759618989056,4.329Ti,project,7000000000000,7Ti,exampleorg/Project-Beta,worker-48,exampleorg/project/project-a
-3,00000000-0000-4000-8000-000000000000,vol_fixture-00000000-0000-4000-8000-000000000000,/projects/project-a,/,228,example-metrics,24727327058944,22.49Ti,project,33000000000000,31Ti,example-metrics,worker-74,example-metrics/projects/project-a
-5,00000000-0000-4000-8000-000000000000,vol_fixture-00000000-0000-4000-8000-000000000000,/sandboxes/session-a,/,155,example-chat,39155129344,36.467Gi,sandbox,100000000000,94Gi,example-chat,worker-13,example-chat/sandboxes/session-a
-5,00000000-0000-4000-8000-000000000000,vol_fixture-00000000-0000-4000-8000-000000000000,/sandboxes/session-a,/,159,example-video,55811019776,51.979Gi,sandbox,100000000000,94Gi,example-video,worker-15,example-video/sandboxes/session-a
-5,00000000-0000-4000-8000-000000000000,vol_fixture-00000000-0000-4000-8000-000000000000,/sandboxes/session-a,sandbox/user_at_example_invalid,85,exampleorg-dataset-manager,111616,109.0Ki,sandbox,100000000000,94Gi,exampleorg,worker-39,exampleorg-dataset-manager/sandboxes/session-a
-5,00000000-0000-4000-8000-000000000000,vol_fixture-00000000-0000-4000-8000-000000000000,/sandboxes/session-a,sandbox/user_at_example_invalid,85,exampleorg-dataset-manager,1431264256,1.333Gi,sandbox,100000000000,94Gi,exampleorg,worker-39,exampleorg-dataset-manager/sandboxes/session-a
-5,00000000-0000-4000-8000-000000000000,vol_fixture-00000000-0000-4000-8000-000000000000,/sandboxes/session-a,sandbox/user_at_example_invalid,232,example-optimize,35729408,34.075Mi,sandbox,100000000000,94Gi,example-optimize,worker-16,example-optimize/sandboxes/session-a
-`)
-	r := Runner{}
 	entryChan := make(chan copyEntry)
-	go r.loadCopyEntryCSV(ctx, bytes.NewReader(testData), entryChan)
+	go r.loadCopyEntryCSV(ctx, bytes.NewBufferString(data), entryChan)
+
+	var entries []copyEntry
 	for entry := range entryChan {
-		log.Printf("%v", entry)
+		entries = append(entries, entry)
+	}
+	return entries
+}
+
+func TestRunnerLoadCopyEntryCSVSkipsHeaderMalformedRowsAndTrimsFields(t *testing.T) {
+	entries := collectCopyEntries(t, Runner{NodeSelector: -1}, copyEntryCSVFixture)
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 valid entries, got %d: %#v", len(entries), entries)
+	}
+
+	first := entries[0]
+	if first.Node != 7 {
+		t.Fatalf("expected first node 7, got %d", first.Node)
+	}
+	if first.SourceVolume != "storage-a" || first.DestinationVolume != "vol-a" {
+		t.Fatalf("expected trimmed volumes, got source=%q destination=%q", first.SourceVolume, first.DestinationVolume)
+	}
+	if first.SourcePath != "/src/a" || first.DestinationPath != "/dst/a" {
+		t.Fatalf("expected trimmed paths, got source=%q destination=%q", first.SourcePath, first.DestinationPath)
+	}
+	if first.SourceProjectId != 1 || first.UsedSize != 1024 || first.VolumeSize != 2048 {
+		t.Fatalf("unexpected parsed numeric fields: %#v", first)
+	}
+
+	second := entries[1]
+	if second.Node != 5 || second.VolumeType != "sandbox" || second.SourceVolumeKey != "key-b" {
+		t.Fatalf("unexpected second entry: %#v", second)
+	}
+}
+
+func TestRunnerLoadCopyEntryCSVAppliesNodeSelector(t *testing.T) {
+	entries := collectCopyEntries(t, Runner{NodeSelector: 5}, copyEntryCSVFixture)
+	if len(entries) != 1 {
+		t.Fatalf("expected one selected entry, got %d: %#v", len(entries), entries)
+	}
+	if entries[0].Node != 5 || entries[0].SourceProjectName != "project-b" {
+		t.Fatalf("unexpected selected entry: %#v", entries[0])
+	}
+}
+
+func TestRunnerLoadCopyEntryCSVReturnsNoEntriesWhenSelectorDoesNotMatch(t *testing.T) {
+	entries := collectCopyEntries(t, Runner{NodeSelector: 42}, copyEntryCSVFixture)
+	if len(entries) != 0 {
+		t.Fatalf("expected no entries, got %d: %#v", len(entries), entries)
 	}
 }
