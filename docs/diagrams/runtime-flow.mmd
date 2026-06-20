@@ -1,0 +1,17 @@
+flowchart TD
+    main[main.go flags/env and command dispatch]
+    copy[copy command]
+    sync[sync command]
+    select[select command]
+    start[start command]
+    stop[stop command]
+    copier[internal/copier Runner]
+    syncer[internal/syncer Runner]
+    selector[internal/selector Runner]
+    daemon[daemonized selector process]
+
+    main --> copy --> copier
+    main --> sync --> syncer --> copier
+    main --> select --> selector --> sync
+    main --> start --> daemon --> selector
+    main --> stop

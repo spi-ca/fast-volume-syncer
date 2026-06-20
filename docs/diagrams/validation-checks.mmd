@@ -1,0 +1,19 @@
+flowchart TD
+    change{Changed surface}
+    docs[Docs or .pi assets]
+    code[Go code]
+    diagrams[Mermaid diagrams]
+    tests[go test ./...]
+    vet[go vet ./...]
+    fmt[gofmt -w / gofmt -l]
+    inventory[README/AGENTS/CLAUDE + docs inventory]
+    pi[.pi JSON parse + frontmatter spot check]
+    diff[git diff --check]
+    grep[stale copied-reference grep]
+
+    change --> docs
+    change --> code
+    change --> diagrams
+    docs --> tests --> inventory --> pi --> diff --> grep
+    code --> fmt --> tests --> vet
+    diagrams --> inventory --> diff

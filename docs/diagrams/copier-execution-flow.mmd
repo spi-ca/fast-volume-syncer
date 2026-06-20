@@ -1,0 +1,23 @@
+flowchart TD
+    input["copy or sync request<br/>source path and destination path"]
+    prepare["internal/copier.Runner.prepareDirectory<br/>stat source and create destination"]
+    scan["internal/copier/find.Scanner<br/>emit Fileinfo entries"]
+    joiner["chunkJoiner<br/>batch by --chunk-size<br/>limit concurrency by --task-size"]
+    deadline["scan deadline ticker<br/>flush partial chunks"]
+    method{"--rsync-enabled?"}
+    native["internal/copier/native.Copier<br/>copy files directly"]
+    rsync["internal/copier/rsync.Task<br/>run rsync with assembled args"]
+    retry["retry policy<br/>attempts delay jitter"]
+    result["aggregate IOResult<br/>collect chunk and scanner errors"]
+    done{"error or context cancel?"}
+    complete["log copy complete"]
+    stopped["log copy stopped<br/>return joined errors"]
+
+    input --> prepare --> scan --> joiner
+    scan --> result
+    joiner --> deadline --> method
+    method -- no --> native --> retry --> result
+    method -- yes --> rsync --> retry --> result
+    result --> done
+    done -- no --> complete
+    done -- yes --> stopped

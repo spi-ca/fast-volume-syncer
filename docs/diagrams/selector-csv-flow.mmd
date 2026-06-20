@@ -1,0 +1,18 @@
+flowchart TD
+    csv[CSV input\nCOPY_INFO_CSV_PATH or default data/09_copy_entries.csv]
+    reader[internal/selector.Runner.loadCopyEntryCSV]
+    skip[Skip header, short rows, blank node, malformed numeric fields]
+    filter{NodeSelector >= 0?}
+    match{row node matches selector?}
+    entry[copyEntry]
+    worker[workerJoiner bounded by --worker-size]
+    sync[fast-volume-syncer sync child]
+
+    csv --> reader
+    reader --> skip
+    reader --> filter
+    filter -- no --> entry
+    filter -- yes --> match
+    match -- yes --> entry
+    match -- no --> skip
+    entry --> worker --> sync

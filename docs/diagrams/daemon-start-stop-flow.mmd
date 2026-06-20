@@ -1,0 +1,19 @@
+flowchart TD
+    startCmd["fast-volume-syncer start<br/>[NODE_SELECTOR|_] [CSV]"]
+    parse["parse selector args<br/>default selector and CSV handling"]
+    entryStart["internal/entry.DaemonStart<br/>read Viper config and log args"]
+    daemonizer["selector.Daemonizer<br/>open log file"]
+    env["assemble child env<br/>_FVS_DAEMONEZED<br/>_PID_FILEPATH<br/>WORKER_SIZE<br/>SANDBOX_DISABLED"]
+    spawn["spawn detached select child<br/>setsid and release process"]
+    child["fast-volume-syncer select _|NODE CSV"]
+    pid["daemonized selector<br/>AcquirePidFile"]
+    rotate["log rotation on SIGHUP<br/>midnight rotation loop"]
+    selectRun["selector.Runner<br/>CSV fan-out to sync children"]
+
+    stopCmd["fast-volume-syncer stop"]
+    readPid["selector.ReadPidFile"]
+    signal["os.FindProcess<br/>SIGTERM"]
+    shutdown["selector signal handler<br/>cancel context and release pid file"]
+
+    startCmd --> parse --> entryStart --> daemonizer --> env --> spawn --> child --> pid --> rotate --> selectRun
+    stopCmd --> readPid --> signal --> shutdown --> selectRun

@@ -1,0 +1,25 @@
+flowchart TD
+    flags["pflag definitions in main.go<br/>defaults and CLI overrides"]
+    env["environment variables<br/>separator replacement to underscores"]
+    viper["Viper binding<br/>flagNameReplacer and envNameReplacer"]
+    parse["command parser<br/>copy sync select start stop"]
+    entry["internal/entry<br/>read typed Viper values"]
+    args["internal/args structs<br/>RsyncArgs RetryArgs<br/>CopierCommonArguments SyncerCommonArguments"]
+    copier["copier.Runner config<br/>file mode scan rsync chunk retry"]
+    syncer["syncer.Runner config<br/>mount hosts/options names<br/>sandbox/report"]
+    selector["selector.Runner / Invoker<br/>worker size and child sync template"]
+    daemon["selector.Daemonizer<br/>pid/log and daemon child env"]
+    childEnv["AssembleEnvironment<br/>propagate settings to child processes"]
+    child["select or sync child process<br/>reads config through Viper/env"]
+
+    flags --> viper
+    env --> viper
+    viper --> parse --> entry
+    entry --> args
+    args --> copier
+    args --> syncer
+    args --> selector
+    args --> daemon
+    selector --> childEnv --> child
+    daemon --> childEnv
+    child --> viper

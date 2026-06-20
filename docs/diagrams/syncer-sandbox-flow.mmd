@@ -1,0 +1,28 @@
+flowchart TD
+    cli["fast-volume-syncer sync<br/>SRC_PATH [SRC_SUBPATH] DST_PATH [DST_SUBPATH]"]
+    entry["internal/entry.Syncer<br/>read Viper args and signals"]
+    runner[internal/syncer.Runner]
+    sandbox{"sandbox enabled<br/>and linux supported?"}
+    isolate[enter namespace sandbox\nsys.Sandbox]
+    temp[create temporary runtime root]
+    mounts[mount source and destination\nwith configured hosts/options/names]
+    report{--report-enabled?}
+    reportLogs[log ls/findmnt/df report output]
+    copier[internal/copier.Runner]
+    scanner["file scanner<br/>find or Go scan"]
+    method{--rsync-enabled?}
+    native[native copier]
+    rsync[rsync tasks]
+    result[copy result / error]
+    cleanup[defer unmount and cleanup]
+
+    cli --> entry --> runner --> sandbox
+    sandbox -- yes --> isolate --> temp
+    sandbox -- no --> temp
+    temp --> mounts --> report
+    report -- yes --> reportLogs --> copier
+    report -- no --> copier
+    copier --> scanner --> method
+    method -- no --> native --> result
+    method -- yes --> rsync --> result
+    result --> cleanup
