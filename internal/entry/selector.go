@@ -1,3 +1,4 @@
+// Package entry adapts CLI commands to signal-aware internal runners.
 package entry
 
 import (
@@ -17,10 +18,11 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
+// Selector adapts the select CLI command to the CSV-driven selector runner.
 func Selector(sandboxSupported bool, nodeSelector int, copyInfoFilePath string) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// 시그널 처리
+	// Stop work on termination and rotate logs in place on SIGHUP.
 	exitSignal := make(chan os.Signal, 1)
 	rotateSignal := make(chan os.Signal, 1)
 	signal.Notify(exitSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)

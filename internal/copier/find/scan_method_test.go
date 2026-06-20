@@ -1,3 +1,4 @@
+// Package find scans source trees with either `find -ls` or an in-process walker.
 package find
 
 import (
@@ -8,6 +9,7 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/returns"
 )
 
+// TestScanner_scanDirectory exercises the in-process walker against the current tree.
 func TestScanner_scanDirectory(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())

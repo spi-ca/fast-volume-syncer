@@ -1,9 +1,13 @@
+// Package util verifies small parsing helpers used by scanner-heavy code paths.
 package util
 
 import "testing"
 
+// TestSimpleStrconv checks the digit-scraping integer parser on empty, positive, and negative inputs.
 func TestSimpleStrconv(t *testing.T) {
+	// args holds one input byte slice for the table-driven parser test.
 	type args struct {
+		// data is the raw byte slice passed to SimpleStrconv.
 		data []byte
 	}
 	tests := []struct {

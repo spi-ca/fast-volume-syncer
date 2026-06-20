@@ -1,3 +1,4 @@
+// Package find scans source trees with either `find -ls` or an in-process walker.
 package find
 
 import (
@@ -7,11 +8,15 @@ import (
 	"fmt"
 )
 
+// Scanner chooses the scanning strategy and buffers discovered entries.
 type Scanner struct {
+	// FinderBinaryPath switches scanning to an external `find -ls` process when set.
 	FinderBinaryPath string
+	// EntryChannelSize sizes the buffered entry stream returned by Scan.
 	EntryChannelSize int
 }
 
+// Scan starts scanning root and returns the entry stream plus a one-shot error channel.
 func (s *Scanner) Scan(ctx context.Context, root string) (<-chan returns.Fileinfo, <-chan error) {
 	entryChan := make(chan returns.Fileinfo, s.EntryChannelSize)
 	errorChan := make(chan error, 1)
@@ -19,6 +24,7 @@ func (s *Scanner) Scan(ctx context.Context, root string) (<-chan returns.Fileinf
 	return entryChan, errorChan
 }
 
+// execute selects the scanner implementation and closes both channels on exit.
 func (s *Scanner) execute(ctx context.Context, root string, entryChan chan<- returns.Fileinfo, errorChan chan<- error) {
 	defer func() {
 		if err := recover(); err != nil {

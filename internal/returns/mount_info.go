@@ -1,22 +1,26 @@
+// Package returns defines result objects shared by worker, sync, and mount flows.
 package returns
 
 import "strings"
 
+// MountInfo describes one NFS mount target and the mount command derived from it.
 type MountInfo struct {
-	// Storage 서버 주소
+	// Host is the NFS server hostname or address.
 	Host string `json:"host"`
 
-	// 서버내의 마운트 주소(볼륨)
+	// Path is the exported directory or volume path on the NFS server.
 	Path string `json:"path"`
 
-	// 마운트 옵션
+	// Options contains additional comma-separated mount options.
 	Options string `json:"options"`
 }
 
+// Type returns the filesystem type used when constructing the mount command.
 func (m MountInfo) Type() string {
 	return "nfs"
 }
 
+// Source returns the NFS source in host:/export/path form.
 func (m MountInfo) Source() string {
 	builder := strings.Builder{}
 	builder.WriteString(m.Host)
@@ -25,6 +29,7 @@ func (m MountInfo) Source() string {
 	return builder.String()
 }
 
+// RefinedOptions prepends addr=<host> and keeps any user-supplied mount options.
 func (m MountInfo) RefinedOptions() string {
 	builder := strings.Builder{}
 	builder.WriteString("addr=")
@@ -36,6 +41,7 @@ func (m MountInfo) RefinedOptions() string {
 	return builder.String()
 }
 
+// MountArg returns the argument list appended after the mount executable name.
 func (m MountInfo) MountArg() (args []string) {
 	args = append(args, "-t")
 	args = append(args, m.Type())
@@ -45,6 +51,7 @@ func (m MountInfo) MountArg() (args []string) {
 	return
 }
 
+// String renders the full mount command for logging and diagnostics.
 func (m MountInfo) String() string {
 	builder := strings.Builder{}
 	builder.WriteString("mount")

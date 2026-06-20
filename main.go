@@ -1,3 +1,4 @@
+// Package main wires CLI flags, environment overrides, and subcommand dispatch for fast-volume-syncer.
 package main
 
 import (
@@ -28,6 +29,7 @@ var (
 	envNameReplacer  = strings.NewReplacer(".", "_", "-", "_")
 )
 
+// init registers CLI flags, enables environment-variable overrides, and binds flag names to Viper keys.
 func init() {
 	flags.String("log-file", fmt.Sprintf("log/%s.log", name), "(daemon only)specify a log file")
 	flags.String("pid-file", fmt.Sprintf("%s.pid", name), "(daemon only)specify a pid file")
@@ -71,6 +73,7 @@ func init() {
 	_ = viper.BindFlagValues(util.PFlagViperReplacer{FlagSet: flags.CommandLine, Replacer: flagNameReplacer})
 }
 
+// main validates argv and dispatches the selected fast-volume-syncer subcommand.
 func main() {
 
 	consumedArgs := 0
@@ -141,6 +144,7 @@ func main() {
 	}
 }
 
+// parseSelectorArgs applies the select/start positional rules, including "_" placeholders and default CSV fallback.
 func parseSelectorArgs(args []string, allowBareUnderscore bool) (int, string, error) {
 	nodeSelector := defaultNodeSelector
 	copyInfoFilePath := defaultCSVFilename
@@ -171,6 +175,7 @@ func parseSelectorArgs(args []string, allowBareUnderscore bool) (int, string, er
 	}
 }
 
+// usage prints the supported CLI forms with the current defaults and exits with status 1.
 func usage() {
 	fmt.Printf("usage: \n"+
 		"\t%s copy SRC_PATH DST_PATH\n"+

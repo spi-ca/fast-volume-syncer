@@ -1,3 +1,4 @@
+// Package sys verifies the platform-independent file-mode parsing helpers.
 package sys
 
 import (
@@ -5,8 +6,11 @@ import (
 	"testing"
 )
 
+// TestUnFilemodeStr checks that common `ls -l` style strings map to the expected fs.FileMode bits.
 func TestUnFilemodeStr(t *testing.T) {
+	// args holds one mode-string input for the table-driven test.
 	type args struct {
+		// modeStr is the textual mode to decode.
 		modeStr string
 	}
 	tests := []struct {

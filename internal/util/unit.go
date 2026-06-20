@@ -1,3 +1,4 @@
+// Package util provides logging, formatting, flag-binding, and binary lookup helpers.
 package util
 
 import (
@@ -6,6 +7,7 @@ import (
 )
 
 var (
+	// sizesIEC contains IEC suffixes for powers of 1024.
 	sizesIEC = []string{
 		"B",
 		"KiB",
@@ -17,6 +19,7 @@ var (
 		"ZiB",
 		"YiB",
 	}
+	// sizes contains decimal suffixes for powers of 1000.
 	sizes = []string{
 		"B",
 		"KB",
@@ -30,10 +33,12 @@ var (
 	}
 )
 
+// logn computes a logarithm in the caller-supplied base.
 func logn(n, b float64) float64 {
 	return math.Log(n) / math.Log(b)
 }
 
+// humanateBytes formats a byte count with the provided base and suffix table.
 func humanateBytes(s int64, base float64, sizes []string) string {
 	if s < 10 {
 		return fmt.Sprintf("%dB", s)
@@ -48,12 +53,12 @@ func humanateBytes(s int64, base float64, sizes []string) string {
 	return fmt.Sprintf(f+"%s", val, suffix)
 }
 
-// FileSize calculates the file size and generate user-friendly string.
+// FileSizeIEC formats bytes with IEC suffixes such as KiB and MiB.
 func FileSizeIEC(s int64) string {
 	return humanateBytes(s, 1024, sizesIEC)
 }
 
-// FileSize calculates the file size and generate user-friendly string.
+// FileSize formats bytes with decimal suffixes such as KB and MB.
 func FileSize(s int64) string {
 	return humanateBytes(s, 1000, sizes)
 }

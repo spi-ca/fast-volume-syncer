@@ -1,3 +1,4 @@
+// Package entry adapts CLI commands to signal-aware internal runners.
 package entry
 
 import (
@@ -17,10 +18,11 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
+// Copier adapts the copy CLI command to copier.Runner with signal cancellation and logging.
 func Copier(srcPath, dstPath string) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// 시그널 처리
+	// Cancel the copy run when the process receives a termination signal.
 	exitSignal := make(chan os.Signal, 1)
 	signal.Notify(exitSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	defer signal.Ignore(syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)

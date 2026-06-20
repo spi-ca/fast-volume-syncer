@@ -1,3 +1,4 @@
+// Package find scans source trees with either `find -ls` or an in-process walker.
 package find
 
 import (
@@ -12,6 +13,7 @@ import (
 	"github.com/charlievieth/fastwalk"
 )
 
+// scanDirectory walks root in-process, emits relative entries, and preserves scan errors.
 func (s *Scanner) scanDirectory(ctx context.Context, root string, rowChan chan<- returns.Fileinfo) error {
 	var errs []error
 	iter := func(path string, d os.DirEntry, err error) error {

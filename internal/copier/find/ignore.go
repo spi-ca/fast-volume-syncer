@@ -1,3 +1,4 @@
+// Package find scans source trees with either `find -ls` or an in-process walker.
 package find
 
 import (
@@ -45,6 +46,7 @@ var (
 	}
 )
 
+// ignoreFilename reports whether path names a file that should never be copied.
 func (s *Scanner) ignoreFilename(path string) bool {
 	filename := filepath.Base(path)
 	// 자기자신은 무시하자
@@ -52,6 +54,7 @@ func (s *Scanner) ignoreFilename(path string) bool {
 	return ok && ignored
 }
 
+// ignoreDirname reports whether path is inside a metadata directory that should be skipped.
 func (s *Scanner) ignoreDirname(path string) bool {
 	filename := filepath.Base(path)
 	// 자기자신은 무시하자
@@ -59,6 +62,7 @@ func (s *Scanner) ignoreDirname(path string) bool {
 	return ok && ignored
 }
 
+// ignore applies the filename and directory skip lists to a scanned entry.
 func (s *Scanner) ignore(path string, mode os.FileMode) bool {
 	if mode.IsDir() {
 		if s.ignoreDirname(path) {

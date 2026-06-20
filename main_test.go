@@ -1,3 +1,4 @@
+// Package main exercises CLI help text and selector-argument parsing.
 package main
 
 import (
@@ -6,6 +7,7 @@ import (
 	"testing"
 )
 
+// runCLIExpectFailure runs `go run .` for a failure path and returns its combined output for usage assertions.
 func runCLIExpectFailure(t *testing.T, args ...string) string {
 	t.Helper()
 
@@ -18,6 +20,7 @@ func runCLIExpectFailure(t *testing.T, args ...string) string {
 	return string(out)
 }
 
+// TestUsageDocumentsSelectorPlaceholderForms checks that the top-level usage text advertises the supported selector placeholders.
 func TestUsageDocumentsSelectorPlaceholderForms(t *testing.T) {
 	output := runCLIExpectFailure(t)
 	for _, want := range []string{
@@ -35,6 +38,7 @@ func TestUsageDocumentsSelectorPlaceholderForms(t *testing.T) {
 	}
 }
 
+// TestSelectRejectsBareCSVPathAndDocumentsUsage confirms that a lone CSV argument is rejected and the placeholder form is shown.
 func TestSelectRejectsBareCSVPathAndDocumentsUsage(t *testing.T) {
 	output := runCLIExpectFailure(t, "select", "custom.csv")
 	for _, want := range []string{
@@ -47,6 +51,7 @@ func TestSelectRejectsBareCSVPathAndDocumentsUsage(t *testing.T) {
 	}
 }
 
+// TestParseSelectorArgs covers selector/default-CSV parsing without invoking the full CLI dispatcher.
 func TestParseSelectorArgs(t *testing.T) {
 	tests := []struct {
 		name                string

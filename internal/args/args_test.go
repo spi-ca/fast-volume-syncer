@@ -1,3 +1,4 @@
+// Package args assembles environment and command arguments for sync and copy workers.
 package args
 
 import (
@@ -8,6 +9,7 @@ import (
 	"time"
 )
 
+// envMap converts KEY=VALUE environment entries into a map for focused assertions.
 func envMap(env []string) map[string]string {
 	m := make(map[string]string, len(env))
 	for _, item := range env {
@@ -19,6 +21,7 @@ func envMap(env []string) map[string]string {
 	return m
 }
 
+// TestRsyncArgsAssembleDefaults verifies the default rsync flags used when every option is disabled.
 func TestRsyncArgsAssembleDefaults(t *testing.T) {
 	got := RsyncArgs{}.Assemble("/src", "/dst")
 	wantContains := []string{
@@ -54,6 +57,7 @@ func TestRsyncArgsAssembleDefaults(t *testing.T) {
 	}
 }
 
+// TestRsyncArgsAssembleEnabledOptions verifies that enabled rsync settings produce the matching flags.
 func TestRsyncArgsAssembleEnabledOptions(t *testing.T) {
 	got := RsyncArgs{
 		Verbose:            true,
@@ -81,6 +85,7 @@ func TestRsyncArgsAssembleEnabledOptions(t *testing.T) {
 	}
 }
 
+// TestCopierCommonArgumentsAssembleEnvironment verifies the full copier environment export, including rsync and retry keys.
 func TestCopierCommonArgumentsAssembleEnvironment(t *testing.T) {
 	args := CopierCommonArguments{
 		FileMode:         os.FileMode(0o640),
@@ -142,6 +147,7 @@ func TestCopierCommonArgumentsAssembleEnvironment(t *testing.T) {
 	}
 }
 
+// TestSyncerCommonArgumentsAssembleEnvironmentIncludesCopierAndMountConfig verifies sync-only mount keys are added after shared copier settings.
 func TestSyncerCommonArgumentsAssembleEnvironmentIncludesCopierAndMountConfig(t *testing.T) {
 	args := SyncerCommonArguments{
 		ReportEnabled:           true,
@@ -176,6 +182,7 @@ func TestSyncerCommonArgumentsAssembleEnvironmentIncludesCopierAndMountConfig(t 
 	}
 }
 
+// contains reports whether want appears in values.
 func contains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

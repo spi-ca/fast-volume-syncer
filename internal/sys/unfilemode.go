@@ -1,3 +1,4 @@
+// Package sys wraps platform-specific process, mount, descriptor, and mode helpers.
 package sys
 
 import (
@@ -23,6 +24,7 @@ const (
 )
 
 var (
+	// filemodeMap maps each `ls -l` mode column to the fs.FileMode bits enabled by that character.
 	filemodeMap = [][]struct {
 		mode fs.FileMode
 		char byte
@@ -64,6 +66,7 @@ var (
 	}
 )
 
+// UnFilemodeStr decodes an `ls -l` style mode string into fs.FileMode and tolerates truncated input.
 func UnFilemodeStr(modeStr string) fs.FileMode {
 	var mode fs.FileMode
 
@@ -81,6 +84,7 @@ func UnFilemodeStr(modeStr string) fs.FileMode {
 	return mode
 }
 
+// UnFilemode decodes the same `ls -l` format from bytes when the caller already guarantees full width input.
 func UnFilemode(modeStr []byte) fs.FileMode {
 	var mode fs.FileMode
 

@@ -1,3 +1,4 @@
+// Package find scans source trees with either `find -ls` or an in-process walker.
 package find
 
 import (
@@ -10,6 +11,7 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/sys"
 )
 
+// TestScanner_testRegex logs the capture groups used to parse `find -ls` output across sample rows.
 func TestScanner_testRegex(t1 *testing.T) {
 	lines := []string{
 		"a",
@@ -86,6 +88,7 @@ func TestScanner_testRegex(t1 *testing.T) {
 	}
 }
 
+// TestScanner_parseFindEntry exercises parseFindEntry across a large sample of captured `find -ls` rows.
 func TestScanner_parseFindEntry(t1 *testing.T) {
 	s := &Scanner{}
 	lines := []string{
@@ -148,6 +151,7 @@ func TestScanner_parseFindEntry(t1 *testing.T) {
 	}
 }
 
+// TestScanner_executeFindCommand runs the external `find` integration path against the current tree.
 func TestScanner_executeFindCommand(t1 *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())

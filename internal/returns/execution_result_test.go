@@ -1,3 +1,4 @@
+// Package returns defines result objects shared by worker, sync, and mount flows.
 package returns
 
 import (
@@ -6,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestExecutionResultLastLogLineKeepsLastTenInOrder verifies the ring buffer keeps only the newest ten stderr lines.
 func TestExecutionResultLastLogLineKeepsLastTenInOrder(t *testing.T) {
 	res := &ExecutionResult{}
 	for _, line := range []string{"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"} {
@@ -19,6 +21,7 @@ func TestExecutionResultLastLogLineKeepsLastTenInOrder(t *testing.T) {
 	}
 }
 
+// TestExecutionResultHandleErrorReturnsNilForSuccessEvenWithLogs verifies successful runs only emit buffered logs.
 func TestExecutionResultHandleErrorReturnsNilForSuccessEvenWithLogs(t *testing.T) {
 	res := &ExecutionResult{}
 	res.AppendLogLine("warning before success")
@@ -27,6 +30,7 @@ func TestExecutionResultHandleErrorReturnsNilForSuccessEvenWithLogs(t *testing.T
 	}
 }
 
+// TestExecutionResultHandleErrorIncludesLastLogsForNonExitError verifies error wrapping includes buffered diagnostics.
 func TestExecutionResultHandleErrorIncludesLastLogsForNonExitError(t *testing.T) {
 	res := &ExecutionResult{Err: errors.New("copy failed")}
 	res.AppendLogLine("first diagnostic")

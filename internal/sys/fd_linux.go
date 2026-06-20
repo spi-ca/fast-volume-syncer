@@ -1,6 +1,7 @@
 //go:build linux
 // +build linux
 
+// Package sys wraps platform-specific process, mount, descriptor, and mode helpers.
 package sys
 
 import (
@@ -9,6 +10,7 @@ import (
 	"syscall"
 )
 
+// PathFromFd resolves /proc/self/fd/N, follows the current symlink target, and returns its file info.
 func PathFromFd(fd uintptr) (string, os.FileInfo, error) {
 
 	path := fmt.Sprintf("/proc/self/fd/%d", fd)

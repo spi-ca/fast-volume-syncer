@@ -1,3 +1,4 @@
+// Package native copies scanned entries with direct filesystem operations.
 package native
 
 import (
@@ -18,6 +19,7 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/copier/find"
 )
 
+// TestLogger exercises the progress-bar logging configuration used by the native copier.
 func TestLogger(t *testing.T) {
 
 	bar := progressbar.NewOptions(1000,
@@ -44,6 +46,7 @@ func TestLogger(t *testing.T) {
 	}
 }
 
+// TestCopier_Execute_find_method stress-tests native copying with the external find scanner.
 func TestCopier_Execute_find_method(t1 *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,6 +130,7 @@ func TestCopier_Execute_find_method(t1 *testing.T) {
 	}
 }
 
+// TestCopier_Execute_scan_method stress-tests native copying with the in-process scanner.
 func TestCopier_Execute_scan_method(t1 *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())

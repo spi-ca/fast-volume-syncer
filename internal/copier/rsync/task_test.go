@@ -1,3 +1,4 @@
+// Package rsync copies file chunks by driving the rsync CLI.
 package rsync
 
 import (
@@ -21,6 +22,7 @@ import (
 	"amuz.es/src/spi-ca/fast-volume-syncer/internal/util"
 )
 
+// TestLogger exercises the progress-bar logging configuration used by rsync tasks.
 func TestLogger(t *testing.T) {
 	bar := progressbar.NewOptions(1000,
 		progressbar.OptionSetWriter(util.LogWriter{}),
@@ -48,6 +50,7 @@ func TestLogger(t *testing.T) {
 	}
 }
 
+// TestRsyncTask_Regex documents how stdout lines are split into filename and "is uptodate" suffix.
 func TestRsyncTask_Regex(t *testing.T) {
 	re := regexp.MustCompile(`^(.+?)( is uptodate)?$`)
 
@@ -74,6 +77,7 @@ func TestRsyncTask_Regex(t *testing.T) {
 
 }
 
+// TestRsyncArgs_assembleArgs logs the assembled rsync command-line arguments.
 func TestRsyncArgs_assembleArgs(t *testing.T) {
 	args := args.RsyncArgs{
 		Verbose:            false,
@@ -90,6 +94,7 @@ func TestRsyncArgs_assembleArgs(t *testing.T) {
 	log.Print("format arguments", args.Assemble("src", "dst"))
 }
 
+// requireRsync skips integration tests when the rsync executable is unavailable.
 func requireRsync(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("rsync"); err != nil {
@@ -97,6 +102,7 @@ func requireRsync(t *testing.T) {
 	}
 }
 
+// TestRsyncTask_Execute_find_method stress-tests rsync copying with the external find scanner.
 func TestRsyncTask_Execute_find_method(t1 *testing.T) {
 	requireRsync(t1)
 
@@ -182,6 +188,7 @@ func TestRsyncTask_Execute_find_method(t1 *testing.T) {
 	}
 }
 
+// TestRsyncTask_Execute_scan_method stress-tests rsync copying with the in-process scanner.
 func TestRsyncTask_Execute_scan_method(t1 *testing.T) {
 	requireRsync(t1)
 

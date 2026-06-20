@@ -1,7 +1,9 @@
+// Package util provides logging, formatting, flag-binding, and binary lookup helpers.
 package util
 
 import "bytes"
 
+// SimpleStrconv extracts decimal digits from a byte slice, preserves a leading minus sign, and returns -1 when no digits are found.
 func SimpleStrconv(in []byte) (number int64) {
 	if len(in) == 0 {
 		return -1
@@ -37,6 +39,7 @@ func SimpleStrconv(in []byte) (number int64) {
 	return
 }
 
+// ScanLineFeed is a bufio.SplitFunc that returns lines without the trailing '\n'.
 func ScanLineFeed(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil

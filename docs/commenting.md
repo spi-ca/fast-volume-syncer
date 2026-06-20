@@ -4,6 +4,7 @@ Use comments to explain non-obvious storage, process, platform, or retry behavio
 
 ## Expectations
 
+- Run `scripts/check-go-comments.py` after comment-related changes to catch packages, functions, methods, structs, interfaces, meaningful struct fields, and interface methods that are missing nearby line comments.
 - Exported Go identifiers should have useful comments when they are part of a package contract.
 - Platform-specific files should explain build-tag behavior only when it affects callers.
 - Risky operational assumptions, such as mount privileges or child-process cleanup, deserve comments near the code that enforces them.
