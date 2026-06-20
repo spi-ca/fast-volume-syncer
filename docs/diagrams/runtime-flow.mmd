@@ -1,17 +1,32 @@
 flowchart TD
-    main[main.go flags/env and command dispatch]
-    copy[copy command]
-    sync[sync command]
-    select[select command]
-    start[start command]
-    stop[stop command]
-    copier[internal/copier Runner]
-    syncer[internal/syncer Runner]
-    selector[internal/selector Runner]
-    daemon[daemonized selector process]
+    main["main.go<br/>flag/env binding + command dispatch"]
 
-    main --> copy --> copier
-    main --> sync --> syncer --> copier
-    main --> select --> selector --> sync
-    main --> start --> daemon --> selector
-    main --> stop
+    subgraph commands[CLI commands]
+        copyCmd["copy<br/>SRC_PATH DST_PATH"]
+        syncCmd["sync<br/>SRC_PATH optional subpaths"]
+        selectCmd["select<br/>optional NODE_SELECTOR and CSV"]
+        startCmd["start<br/>optional NODE_SELECTOR/_ and CSV"]
+        stopCmd["stop"]
+    end
+
+    subgraph entry[internal/entry adapters]
+        copierEntry["entry.Copier"]
+        syncerEntry["entry.Syncer"]
+        selectorEntry["entry.Selector"]
+        daemonStart["entry.DaemonStart"]
+        daemonStop["entry.DaemonStop"]
+    end
+
+    subgraph runners[core runners]
+        copier["internal/copier Runner"]
+        syncer["internal/syncer Runner"]
+        selector["internal/selector Runner"]
+        daemon["daemonized selector process"]
+    end
+
+    main --> copyCmd --> copierEntry --> copier
+    main --> syncCmd --> syncerEntry --> syncer --> copier
+    main --> selectCmd --> selectorEntry --> selector
+    selector -->|spawns bounded sync children| syncCmd
+    main --> startCmd --> daemonStart --> daemon --> selector
+    main --> stopCmd --> daemonStop

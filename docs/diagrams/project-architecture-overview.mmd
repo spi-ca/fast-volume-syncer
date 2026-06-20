@@ -1,0 +1,64 @@
+flowchart LR
+    user[운영자 / 자동화]
+    csv[CSV 작업 목록\nnode, source/destination, subpath]
+    flags[CLI flags + ENV\nViper binding]
+
+    subgraph cli[CLI surface]
+        copy[copy]
+        sync[sync]
+        select[select]
+        start[start]
+        stop[stop]
+    end
+
+    subgraph entry[entry adapters\ninternal/entry]
+        copyEntry[Copier]
+        syncEntry[Syncer]
+        selectorEntry[Selector]
+        daemonStart[DaemonStart]
+        daemonStop[DaemonStop]
+    end
+
+    subgraph runtime[core runtime packages]
+        selectorRunner[internal/selector\nCSV parse, node filter, worker fan-out]
+        syncerRunner[internal/syncer\nmount/sandbox/report setup]
+        copierRunner[internal/copier\nscan, chunk, retry, join]
+        native[internal/copier/native\nGo file copy]
+        rsync[internal/copier/rsync\nrsync task execution]
+    end
+
+    subgraph support[support packages]
+        args[internal/args\ntyped config + child env]
+        returns[internal/returns\nresult, file, mount data]
+        sys[internal/sys\nbuild-tagged exec/mount/fd helpers]
+        util[internal/util\nlogging, lookup, conversion]
+    end
+
+    subgraph platform[platform + evidence boundaries]
+        linux[Linux privileged path\nmount namespace + NFS mounts]
+        nonlinux[non-Linux\nunsupported syscalls behind build tags]
+        validation[validation docs/tests\ngo test, tagged integration, runbook evidence]
+    end
+
+    user --> flags --> cli
+    user --> csv --> select
+    cli --> copy --> copyEntry --> copierRunner
+    cli --> sync --> syncEntry --> syncerRunner --> copierRunner
+    cli --> select --> selectorEntry --> selectorRunner
+    cli --> start --> daemonStart --> selectorRunner
+    cli --> stop --> daemonStop
+
+    selectorRunner -->|bounded sync children| sync
+    selectorRunner --> args
+    syncerRunner --> args
+    copierRunner --> args
+    copierRunner --> native
+    copierRunner --> rsync
+    runtime --> returns
+    runtime --> util
+    syncerRunner --> sys
+    selectorRunner --> sys
+
+    syncerRunner --> linux
+    sys --> nonlinux
+    validation -. guards claims .-> linux

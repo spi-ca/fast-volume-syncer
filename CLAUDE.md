@@ -57,9 +57,14 @@ PY
 git diff --check
 ```
 
+For diagram changes also run the Mermaid SVG/2x PNG render loop from `docs/operations.md`.
+
 For code changes also run:
 
 ```bash
 gofmt -w .
+scripts/check-go-comments.py
+go test -tags=integration -run '^$' .
+go test -tags='integration,nfs' -run '^$' .
 go vet ./...
 ```

@@ -1,5 +1,11 @@
 # Architecture
 
+## Overview diagram
+
+![fast-volume-syncer project architecture overview](diagrams/project-architecture-overview.svg)
+
+This diagram shows the repository-level boundaries between CLI commands, `internal/entry` adapters, runtime packages, shared support packages, platform-specific helpers, and validation/evidence surfaces. The source Mermaid file is [`diagrams/project-architecture-overview.mmd`](diagrams/project-architecture-overview.mmd).
+
 ## Entry points
 
 - `main.go` defines CLI flags, environment binding, command parsing, defaults, and usage output.
@@ -11,14 +17,14 @@
 - `internal/copier/find` provides file discovery using external `find` or Go scanning paths.
 - `internal/copier/native` implements native file copying.
 - `internal/copier/rsync` builds and runs rsync tasks.
-- `internal/syncer` handles mount/sandbox preparation and invokes the copier.
+- `internal/syncer` handles mount/sandbox preparation, pins selected subpath roots through fd-backed bind mounts, and invokes the copier.
 - `internal/selector` parses copy-entry CSV data and fans out sync child processes.
 
 ## Shared support
 
-- `internal/args` centralizes typed access to Viper-backed configuration.
+- `internal/args` defines typed configuration carriers and assembles retry options, rsync arguments, and child-process environment values; `internal/entry` performs the Viper reads.
 - `internal/returns` defines serializable result and file/mount information types.
-- `internal/sys` wraps platform-specific filesystem, mount, fd, and process helpers.
+- `internal/sys` wraps platform-specific filesystem, mount, fd, `openat2`, bind-mount, and process helpers.
 - `internal/util` contains logging, lookup, conversion, unit parsing, and flag binding helpers.
 
 ## Boundaries

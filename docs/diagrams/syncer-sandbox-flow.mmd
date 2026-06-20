@@ -1,25 +1,29 @@
 flowchart TD
     cli["fast-volume-syncer sync<br/>SRC_PATH [SRC_SUBPATH] DST_PATH [DST_SUBPATH]"]
-    entry["internal/entry.Syncer<br/>read Viper args and signals"]
-    runner[internal/syncer.Runner]
-    sandbox{"sandbox enabled<br/>and linux supported?"}
-    isolate[enter namespace sandbox\nsys.Sandbox]
-    temp[create temporary runtime root]
-    mounts[mount source and destination\nwith configured hosts/options/names]
-    report{--report-enabled?}
-    reportLogs[log ls/findmnt/df report output]
-    copier[internal/copier.Runner]
+    selector["selector invoker child<br/>sets _SYNCER_INVOKED and _SYNCER_SANDBOXED"]
+    entry["internal/entry.Syncer<br/>read Viper args and child env"]
+    runner["internal/syncer.Runner"]
+    sandbox{"selector child sandbox enabled<br/>and linux supported?"}
+    isolate["enter child mount namespace sandbox<br/>sys.Sandbox"]
+    temp["create temporary runtime root"]
+    mounts["mount source and destination<br/>with configured hosts/options/names"]
+    pin["open subpaths with openat2<br/>bind-mount pinned roots into workspace"]
+    report{"--report-enabled?"}
+    reportLogs["log ls/findmnt/df report output<br/>may include path and mount metadata"]
+    copier["internal/copier.Runner"]
     scanner["file scanner<br/>find or Go scan"]
-    method{--rsync-enabled?}
-    native[native copier]
-    rsync[rsync tasks]
-    result[copy result / error]
-    cleanup[defer unmount and cleanup]
+    method{"--rsync-enabled?"}
+    native["native copier"]
+    rsync["rsync tasks"]
+    result["copy result / error"]
+    cleanup["defer recursive unmount and cleanup"]
 
-    cli --> entry --> runner --> sandbox
+    cli --> entry
+    selector --> cli
+    entry --> runner --> sandbox
     sandbox -- yes --> isolate --> temp
-    sandbox -- no --> temp
-    temp --> mounts --> report
+    sandbox -- no direct sync or disabled --> temp
+    temp --> mounts --> pin --> report
     report -- yes --> reportLogs --> copier
     report -- no --> copier
     copier --> scanner --> method

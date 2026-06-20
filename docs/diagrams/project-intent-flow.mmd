@@ -1,0 +1,13 @@
+flowchart TD
+    problem[운영 과제\n여러 스토리지 경로의 대량 복사·동기화]
+    intent[프로젝트 의도\nCSV로 작업을 선언하고 노드별로 안전하게 분산 실행]
+    csv[작업 목록 CSV\nsource / destination / selector metadata]
+    node[노드 선택자\n이 노드가 맡을 작업만 필터링]
+    limit[동시성 제어\nworker-size / task-size / chunk-size]
+    isolation[실행 격리\nLinux sandbox + source/destination mount]
+    engine[복사 엔진\nnative copier 또는 rsync]
+    result[결과\n대상 스토리지에 파일 트리 반영]
+    daemon[선택 사항\nstart/stop으로 selector 데몬화]
+
+    problem --> intent --> csv --> node --> limit --> isolation --> engine --> result
+    intent -. unattended run .-> daemon -. runs selector .-> node

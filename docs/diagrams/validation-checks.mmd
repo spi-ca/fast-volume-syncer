@@ -2,18 +2,27 @@ flowchart TD
     change{Changed surface}
     docs[Docs or .pi assets]
     code[Go code]
+    integration[Integration test sources]
     diagrams[Mermaid diagrams]
-    tests[go test ./...]
+    fmt[gofmt -w .]
+    comments[scripts/check-go-comments.py]
+    render["Mermaid render<br/>SVG + 2x PNG"]
+    tagged["go test -tags=integration -run '^$' .<br/>go test -tags='integration,nfs' -run '^$' ."]
+    tests["go test ./...<br/>guardrails rerun comments + tagged compile"]
     vet[go vet ./...]
-    fmt[gofmt -w / gofmt -l]
     inventory[README/AGENTS/CLAUDE + docs inventory]
     pi[.pi JSON parse + frontmatter spot check]
     diff[git diff --check]
-    grep[stale copied-reference grep]
 
     change --> docs
     change --> code
+    change --> integration
     change --> diagrams
-    docs --> tests --> inventory --> pi --> diff --> grep
-    code --> fmt --> tests --> vet
-    diagrams --> inventory --> diff
+    docs --> tests
+    code --> fmt --> comments --> tagged --> tests
+    integration --> fmt --> comments --> tagged --> tests
+    integration --> vet
+    diagrams --> render --> tests
+    code --> vet
+    tests --> inventory --> pi --> diff
+    vet --> diff

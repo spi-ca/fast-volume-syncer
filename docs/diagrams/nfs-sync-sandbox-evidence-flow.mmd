@@ -1,0 +1,24 @@
+flowchart TD
+    claim{NFS/mount sandbox\n검증 주장이 필요한가?}
+    baseline[일반 CI / 로컬 기본 검증\ngo test ./...]
+    privileged{privileged Linux +\nreachable disposable NFS exports?}
+    skip[통합 skeleton은 t.Skip\nNFS 검증은 UNVERIFIED로 보고]
+    inputs[FVS_TEST_* 입력 준비\nNFS host/export/subpath/verify roots]
+    private[private disposable verify roots\nowner-only, no symlink components]
+    skeleton[선택 실행\ngo test -tags='integration,nfs'\n-run TestNFSSyncSandboxE2E]
+    runbook[수동 runbook 실행\nsudo env -i + select 0 one-row.csv]
+    child[selector-launched sync child\nmount namespace sandbox]
+    evidence[증거 수집\nstdout/stderr, findmnt, checksum, readlink, cleanup]
+    report{증거가 모두 첨부됐는가?}
+    verified[NFS 검증 완료 주장 가능\nrunbook/evidence 링크 필수]
+    unverified[NFS/mount sandbox는\n미검증으로 보고]
+
+    claim -- no --> baseline
+    claim -- yes --> privileged
+    privileged -- no --> skip --> unverified
+    privileged -- yes --> inputs --> private
+    private --> skeleton --> child
+    private --> runbook --> child
+    child --> evidence --> report
+    report -- yes --> verified
+    report -- no --> unverified
